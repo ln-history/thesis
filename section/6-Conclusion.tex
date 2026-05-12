@@ -1,0 +1,300 @@
+\chapter{Conclusion}
+\label{ch:conclusion}
+
+The conclusion is divided into three sections and summarizes the core findings of this thesis.
+In \autoref{sec:platform-performance}, we assess the performance of the \tech{ln-history} platform,
+specifically how well the platform architecture met its requirements in a production environment and how to improve it.
+
+After that we delve into a discussion about the meaning of the analysis.
+\autoref{sec:ln-gossip-protocol-conclusion} presents a conclusion about the \autoref{sec:metadata-analysis}.
+Likewise, the \autoref{sec:ln-evolution} concludes the \autoref{sec:historic-gossip-analysis}.
+
+
+\section{\tech{ln-history} Platform Performance}
+\label{sec:platform-performance} 
+
+The evaluation of the platform's functional and non-functional requirements demonstrates
+that the \tech{ln-history} architecture is capable of supporting advanced, empirical network research.
+
+Through its custom data model, the platform manages long-term data storage and persistence (\ref{req:persistance}), 
+alongside fulfilling the dual-format constraint for preserving both raw wire bytes and parsed data (\ref{req:dual-format}). 
+
+For historical analysis, the system achieves snapshot retrieval (\ref{req:snapshot}) times averaging under \qty{3}{\second}.
+However, we observed that while database retrieval is exceptionally fast, 
+the resulting payload for a modern network snapshot still requires approximately \qty{50}{\mega\byte}. 
+Consequently, network bandwidth and not the database performance remains 
+the primary temporal bottleneck for end-users executing these queries.
+
+In terms of real-time operations, the platform demonstrated reliability, 
+running stably without major outages throughout the 48-day collection window. 
+The real-time ingestion pipeline successfully processed multiple gigabytes of gossip messages (\ref{req:ingestion}), 
+consistently maintaining an ingestion lag of under \qty{5}{\minute} under normal network conditions
+without blocking parallel analytical queries (\ref{req:concurrency}). 
+
+Meeting the non-functional requirements self-hostability (\ref{req:self-host}) and 
+long-term maintainability (\ref{req:maintainability}) proved more challenging. 
+While the system can operate on small-scale hardware, processing heavy \gls{olap} queries and 
+bulk ingestions pushed the server to its thermal limits.
+
+Maintaining optimal query performance requires active administration.
+The commands \code{ANALYZE VACUUM FULL} and \code{CLUSTER} are necessary to prevent index degradation over time. 
+Those challenges lead to the decision to migrate the database to a dedicated datacenter \gls{vps} 
+ensuring the reliability required for the empirical analysis in this thesis.
+
+
+\section{Lightning Network Gossip Protocol}
+\label{sec:ln-gossip-protocol-conclusion}
+
+
+\subsection{Network Gossip Volume and Lag}
+
+As \autoref{sec:metadata-analysis} shows, Lightning nodes do not inherently have a 
+correctly synchronized or complete view of the network topology. 
+Beyond that, the protocol has disparities in propagation latency depending on the message type. 
+Compounding these synchronization inefficiencies is the suboptimal utilization of node bandwidth. 
+During data cleaning, more than half of the collected \code{node\_announcements} 
+were broadcasted redundantly without containing any novel topological information. 
+Given the propagation blind spots, the inherent latency variations, and the overhead of redundant metadata, 
+it is evident that researching and implementing optimizations to the gossip protocol is necessary for long-term scalability. 
+Various approaches to address these architectural bottlenecks will be discussed in the upcoming \autoref{ch:future-work}.
+
+
+\subsection{Peer Session Analysis}
+
+This thesis contributes empirical observations regarding the peer management behaviour of default \gls{cln} nodes. 
+While the \gls{ln} operates without an enforcement to forward gossip messages, 
+active participation in the gossip protocol fundamentally relies on stable \gls{p2p} connections. 
+The analysis demonstrated that peer session durations exhibit immense variance, ranging from minutes to weeks. 
+When coupled with the synchronization inaccuracies discussed previously, 
+the connection instability can yield to missing gossip messages.
+
+Nodes that offer routing services are economically incentivized to maintain highly reliable peer connections,
+a dynamic empirically supported by our finding that total node capacity positively correlates with the session duration. 
+By ensuring uninterrupted access to real-time topological updates and fee policies, 
+these enterprise-level hubs can minimize payment routing failures and optimize their overall service reliability.
+Smaller nodes that have an unstable connection are more prone to payment failures. 
+By missing critical \code{channel\_updates} during periods of downtime, 
+these nodes risk to use outdated fee policies and inaccurate topological data during their pathfinding calculations.
+
+
+
+\section{Lightning Network Evolution}
+\label{sec:ln-evolution}
+
+The evolution of the \gls{ln} is a complex topic and can be analysed from different of angles.
+As we will see, the network has matured in the past eight years.
+Nonetheless, there still many open questions and possible improvements to be made.
+
+Following the structure of the \autoref{sec:historic-gossip-analysis}, 
+we first discuss the quality of the gossip dataset currently persisted in the \tech{ln-history} platform.
+After that we will, examine empirical measurements of channels.
+Lastly, we will dive into discussions about the centrality of the \gls{ln}.
+
+
+\subsection{Collected Gossip Messages}
+
+As mentioned in \autoref{sec:historic-gossip-analysis}, evaluating the complete 
+repository of over \num{91.3} million historical gossip messages 
+reveals two distinct phases of intensive data collection, 
+separated by a multi-year observational blind spot between 2022 and mid-2025. 
+
+Despite this gap in ephemeral \code{channel\_updates}, 
+the structural integrity of the historical network graph can be approximated reconstructed 
+because the foundational \code{channel\_announcements} were largely preserved. 
+
+Furthermore, the \autoref{fig:gossip-messages-distribution} shows a hierarchy in network traffic composition. 
+Dynamic \code{channel\_updates} dominate the broadcast volume, followed by informational \code{node\_announcements}, 
+while structural \code{channel\_announcements} represent only a marginal fraction of the gossip protocol.
+
+
+
+\subsection{Channels}
+
+Payment channels form the core of the \gls{ln} protocol. 
+In this section, we discuss the empirical findings of over \num{283226} channels.
+The theoretical objective of a payment channel is to remain open indefinitely, 
+allowing nodes to route an unlimited number of off-chain transactions while 
+amortizing the initial on-chain setup fees. 
+However, as \autoref{fig:channel-lifetime-distribution} illustrates, 
+the empirical reality is different: of all channels that have ever been funded, more than \qty{75}{\percent}
+
+It is reasonable to assume that larger channels might have a longer lifespan than smaller ones. 
+Node operators committing significant financial capital to open large channels 
+likely plan their network topology more carefully. 
+To test this hypothesis, we measured the correlation between channel capacity (\code{capacity\_sat}) 
+and channel lifetime (\autoref{fig:channel-lifetime-correlation}).
+
+Surprisingly, the data reveals no correlation between these two variables. 
+A channel's financial size does not predict how long it will remain open.
+
+Another interesting observation shows the scatter plot. 
+Channel capacities with round numbers (e.g., \code{capacity\_sat} ending in $00000$) appear more often (see: purple vertical lines). 
+This clustering indicates that funding amounts are rarely mathematically optimized for exact routing needs. 
+Instead, they are often chosen based on human intuition or simple convenience.
+
+Ultimately, channel management proves to be far more complex than 
+simply opening a connection and leaving it alone. 
+The closure rate of over \qty{80}{\percent}, considering the networks whole history, can arguably be considered high.
+Combined with the lack of correlation to capacity—indicates that channels frequently require active adjustments, closures, and rebalancing. 
+This reality affects all participants, regardless of whether they are a professional hub or an individual hobbyist.
+
+
+
+\subsection{Centrality}
+
+The academic discourse surrounding centrality in the \gls{ln} is extensive, 
+compared to other research areas of the \gls{ln} protocol. 
+Numerous studies have applied a wide range of graph-theoretic metrics 
+to historic snapshots to quantify the network's topology (e.g., \cite{atmanaviciute_quantitative_2025}). 
+The empirical data presented in \autoref{sec:centrality} aligns with this literature, 
+confirming that the network is highly centralized according to \gls{bc}.
+
+This thesis argues that the academic narrative is often one-sided. 
+
+Applying centrality metrics to static snapshots to condemn the network for deviating from Bitcoin's decentralized ethos,
+fails to critically evaluate the resulting operational value that dominant nodes provide.
+
+From an economic and operational perspective, a centralized topology is a logical and arguably beneficial development. 
+Professional routing hubs provide vital liquidity and continuous uptime necessary for a functional payment network. 
+The presence of these dedicated backbone nodes is likely a driver behind the 
+high payment success rates and overall service reliability that the \gls{ln} currently provides~\cite{random__reran_2024}.
+
+Enforcing strict, uniform decentralization would likely fragment liquidity and increase routing failures.
+
+Nonetheless, from the perspectives of privacy, censorship resistance, and systemic independence, 
+this centralization of routing power remains highly concerning. 
+Relying on a handful of dominant hub operators directly contradicts the foundational, 
+\gls{p2p} ethos of the Bitcoin ecosystem. 
+These central hubs represent a massive vulnerability regarding user privacy. 
+While Lightning payments utilize onion routing, central hubs process such a massive share of the total traffic 
+that they are uniquely positioned to perform traffic analysis. 
+By monitoring the flow, timing, and channel balances of adjacent packets, 
+dominant routing nodes could theoretically trace and deanonymize payment flows, 
+severely degrading the privacy guarantees originally engineered into the protocol~\cite{pickhardt_security_2021}.
+
+Ultimately, the centrality of the \gls{ln} represents compromise that distributed systems have to face by design. 
+The network has organically gravitated toward a topology that sacrifices a degree of ideological decentralization and 
+strict privacy to achieve the operational efficiency, liquidity, and reliability required for real-world adoption.
+
+\iffalse
+\subsection{Functional Requirements}
+
+\subsubsection{Data Storage \& Persistence (RF 1 \& 2)}
+Thanks to the database centric layout with its custom data model,
+the first two functional requirements RF1 and RF2 are met.
+
+\subsubsection{Querying \& Historic Analysis (RF 3 - 5)}
+To make \gls{olap} queries a lot of index maintanance is necessary.
+The storage used by indexes reaches about the storage of the actual data
+but is necessary to provide in depth analysis.
+
+\paragraph{Snapshot Retrieval RF3}
+The thrid functional requirement (RF3) stating that the plaform is able to retrive 
+historic snapshots has been met very well. 
+The pure retrieval of gossip messages from the database 
+taks on average less than $\qty{3}{s}$. 
+
+As the database utilizses its \gls{ram} to keep data that is often requested \textit{warm},
+snapshot queries for similar timestamp can yield results even quicker.
+As the analysis has shown snapshots with thousands of nodes and edges take up space.
+A snapshot of the current lightning network from the \tech{ln-history} plaform,
+which already reduces the number of gossip messages drastically and sends them in raw bytes,
+still needs aroude $\qty{50}{\mega B}$, which depending on the network bandwidth
+takes significantly more time to download than the actual retrieval from storage.
+
+This main feature is working \textit{lightning} fast and shows that the \tech{ln-history}
+platform is a significant upgrade for researchers when analysing historic snapshots.
+
+\paragraph{Time-Window Retrieval RF4}
+The fourth functional requirement (RF4) initially sounds interesting and close by
+the snapshot retrieval but at the time of writing this thesis there has not been
+many analysis ideas been found. 
+The queries are, depending on the length of the time window,
+rapid fast but still there is no use case yet.
+
+\paragraph{Entity Filtering RF5}
+This requirement is fulfilled and used in multiple queries specifically analysis
+over channels or nodes.
+
+
+\subsubsection{Real-Time Operations RF6 - RF10}
+As shown in the first part of the analysis \autoref{sec:metadata-analysis},
+the \tech{ln-history} platform has been running stable between  
+%START_DATETIME_STR = "2026-01-14T00:00:00Z"
+%END_DATETIME_STR = "2026-03-03T00:00:00Z"
+.
+In that time it processed multiple $\qty{}{\giga B}$ of gossip messages and
+was able to ingest them.
+
+
+\paragraph{Low-Latency Ingestion RF6}
+RF6 which requires the database to reflect the live state of the network
+by quickly inserting new gossip is reached.
+The database thanks to batching gossip messages into a database transactions,
+the ingestion throughput is not a problem and the \service{ln-history-database}
+is capable to ingestion an order of magnitude more messages per second as normally
+occur in the \gls{ln}
+
+\paragraph{Concurrency RF7}
+This requirement is almost fully met. In phases of exceptionally high workloads
+onto the database (e.g. generation of many snapshots or complex \gls{olap} queries)
+the insertion almost stops and an ingestion lag builds up.
+But under normal conditions, the lag remains below $\qty{10}{s}$.
+
+\paragraph{Multiple nodes RF8}
+As of writing this thesis only two nodes have been collecting gossip messages.
+The platform was capable of managing those, it should be possible to scale to at least
+five concurrent running nodes.
+
+\paragraph{Metadata RF9}
+Thanks to the introduction of the \code{gossip\_inventory} and \code{gossip\_observations}
+every collected gossip message immediatly gets an unique identifier \code{gossip\_id}.
+Together with the \code{collector\_node\_id}, makes every gossip message unique.
+Since every recieved gossip message gets its timestamp appended to it, it is really
+easy to do propergation lag analysis over the gossip dataset. 
+
+
+\paragraph{Batch ingestion RF10}
+This script is doing its job but needs refactoring, since its generally a manaul 
+process occuring rarely we consider this circumstance as fine.
+Nonetheless, batch ingestions require the \service{gossip-processor} to stop
+otherwise the ingestion will (depending on the size) take multiple days.
+
+
+\subsection{Non-Functional Requirements}
+The Non-Functional Requirements were defined by the following paragraphs and 
+have sometimes been more challenging to meet than the functional ones.
+
+\paragraph{Transparency \& Auditability (Open Source) NF 1}
+This requirement forces the \tech{ln-history} platform to be fully open source
+making it possible for other researchers to verify the results.
+It met, by the fact that the source code of each component is openly available
+\footnote{See https://github.com/ln-history}.
+
+
+\paragraph{Deployability (Containerization) NF 2}
+Thanks to the usage of Docker every component is containerized and working as intended.
+
+\paragraph{Efficiency (Self-Hostability) NF 3}
+This requirement was by far the most difficult to meet. 
+We own a small scale server with a five-threaded CPU and DDR5 \gls{ram} as well
+as modern NVMe SSD storage.
+Nonetheless, during high \gls{olap} queries or at startup, where large amount
+of missing gossip messages were being analysed / ingested, the server got heated up.
+Since the platform ran without major outtage for 48 consecutive days, we consider this
+requirement met, although for doing the analysis in chapter \autoref{ch:empirical-data-analysis},
+we moved the database to a VPS in a datacenter, which in comparision proved so much more reliability.
+
+
+\paragraph{Maintainability (long-term) NF 4}
+Although the architecture strongly follows the \textit{Seperation of Concerns} pattern,
+having multiple (independent) services working together, the maintainability can still be challenging.
+Different gossip formats require delicate handling as updating already inserted gossip messages can get really difficult.
+Also changing the interface of one service can have devistating cascading effects,
+where the other components in the processing pipeline crash.
+During development those constaintraints often lead to hours or days of troubleshooting.
+
+Also the \service{ln-history-database} needs regular active maintainance to provide the expected service.
+Especially the indixes and what postgres thinks of them deviates over time.
+Using \code{ANALYZE VACUUM FULL} is a must, as well as regular \code{CLUSTER} commands  
+\fi

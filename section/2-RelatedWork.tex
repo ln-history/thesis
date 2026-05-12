@@ -1,0 +1,149 @@
+\chapter{Related Work} 
+\label{ch:related-work}
+
+% Motivation for p2p network monitoring
+Both the Bitcoin network and the \gls{ln} operate as decentralized, peer-to-peer (\gls{p2p}) networks governed by open-source protocols.
+A fundamental characteristic of them is the absence of a central authority. 
+Instead, thousands of independent nodes continuously exchange data to maintain consensus and route payments. 
+Obtaining a complete view of the network's topology and traffic is inherently difficult.
+
+Despite these observability challenges, the transparent nature of both networks has generated interest across various areas. 
+Academic researchers, commercial enterprises, mining pools, and government institutions all have interest in 
+monitoring, capturing, and persisting this \gls{p2p} network data. 
+
+\autoref{tab:motivation-p2p-monitoring} shows these diverse motivations, 
+which can be grouped into two categories: \textit{technical} and \textit{intelligence}.
+Researchers and protocol developers primarily focus on the \textit{technical} objectives 
+e.g., mapping topologies, measuring propagation performance, and identifying vulnerabilities. 
+In contrast, commercial entities and law enforcement agencies operate on \textit{intelligence} objectives e.g., 
+using network observability to optimize routing services, monetize analytics, or conduct forensic financial tracing.
+
+\begin{table}[htpb]
+    \centering
+    \caption{Motivations for monitoring Bitcoin and Lightning \gls{p2p} network traffic, grouped by entity and objective.}
+    \label{tab:motivation-p2p-monitoring}
+    \begin{tabularx}{\textwidth}{@{} p{2.5cm} l X @{}}
+        \toprule
+        \textbf{Entity} & \textbf{Primary Objective} & \textbf{Specific Motivations} \\
+        \midrule
+        Researchers \newline \& Developers
+         & Vulnerability discovery & Observing and simulating network-level attacks. \\
+         & Measuring performance & Analysing \gls{isp} centralization, propagation delays, and bandwidth overhead. \\
+         & Topology mapping & Mapping network topology; analysing the distribution of nodes, clients, and channels. \\
+        & Protocol improvement & Validating new protocol proposals against empirical network data. \\
+        & Debugging & Detecting bugs in client implementations; monitoring node adoption of consensus upgrades. \\
+        & Network health & Detecting transaction spam and potential network partitions. \\ 
+        \addlinespace
+       
+        Miners & Competitive advantage & Monitoring transaction relay and prioritizing the rapid discovery of newly mined blocks. \\  
+        \addlinespace
+        
+        Companies & Commercial Intelligence & Monetizing network analytics; optimizing routing algorithms and liquidity services. \\
+        \addlinespace
+        
+        Governments & Law Enforcement & Sanctions compliance; identifying node operations within restricted jurisdictions. \\
+         & Forensics & Tracing the origin of illicit funds (e.g., ransomware); de-anonymizing users by linking transaction broadcast IPs to public keys. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+
+\section{Bitcoin Network Data}
+
+% Academic
+Academic literature about \gls{p2p} network traffic is extensive. 
+In 2013 \citeauthor{decker_information_2013}  % \citeyear{} does not work?
+laid the foundation with their paper \citetitle{decker_information_2013} ~\cite{decker_information_2013}
+by measuring the propagation delay of newly found blocks and subsequently the number of forks occurring.
+
+Nowadays, academic institutions like the Karlsruhe Institute of Technology (KIT) ~\cite{neudecker_2026_14627526} 
+provide live analysis of the \gls{p2p} network data in their \term{bitnodes} project.
+The analysis looks at different topics like the version of the \term{User agents} 
+indicating the distribution of client versions on the Bitcoin mainnet, 
+the geographic distribution of nodes by country, propagation delays and much more~\cite{kit_bitcoin_monitoring_web}. 
+
+
+% Independent researchers
+Due to Bitcoins free and open source ethos a variety of independent researchers work actively on Bitcoin. 
+A subset of those focus on the \gls{p2p} network traffic.
+
+The researcher \citeauthor{0xb10c_map_2026} maintains the project \citetitle{0xb10c_map_2026} showing 
+various projects (including \tech{ln-history}) that focus on \gls{p2p} network monitoring.
+
+Early Bitcoin Core contributor \citeauthor{corallo_21ninja}, shows his research, 
+which focuses on DNS seed metrics and reachable nodes, on this website\footnote{\url{https://21.ninja}}~\cite{corallo_21ninja}.
+Additionally, researcher \citeauthor{lopp_satoshi_info} maintains the \term{statoshi} project\footnote{\url{https://statoshi.info}}, 
+providing extensive network visualizations~\cite{lopp_satoshi_info}
+
+To minimize propagation latency and reduce the risk of stale block races, miners can use 
+high-speed overlay networks outside the traditional Bitcoin \gls{p2p} topology, 
+such as the \gls{fibre}~\cite{corallo_fibre}.
+
+
+% Companies and Governments 
+Blockchain Intelligence Companies like \term{Chainalysis} provide tracing services 
+which are demanded by law enforcement and compliance professionals. 
+By using \term{attribution}, a process where information like a name or an ip-address gets 
+linked to a (bitcoin-)address, they often own unique and sensitive information.
+In 2025, \citeauthor{lubbertsen_ghost_2025} conducted a case study 
+evaluating the accuracy of \term{Chainalysis} tracing services, 
+demonstrating a false-positive rate of less than \qty{0.5}{\percent}~\cite{lubbertsen_ghost_2025}.
+
+The need for this kind of observability was recognized early by governmental and regulatory institutions. 
+In the early 2010s, reports from the \citeauthor{federalbureauofinvestigation_wayback_2014}~\cite{federalbureauofinvestigation_wayback_2014} 
+and the \citeauthor{europeancentralbank_virtual_2012}~\cite{europeancentralbank_virtual_2012} 
+highlighted the dual nature of decentralized networks. 
+Both institutions warned that while Bitcoin's pseudonymous design introduces significant money-laundering risks, 
+its permanently public broadcast data and blockchain simultaneously offer forensic tracing opportunities.
+
+
+
+\section{Lightning Network Gossip Data}
+
+The \gls{ln}, which builds upon the Bitcoin network, requires similar network observability. 
+Since \gls{ln} nodes must independently route payments across channels, 
+every participant must maintain an up-to-date view of the network topology. 
+This state is continuously synchronized via \gls{p2p} gossip messages, 
+the technical details of which are detailed in \autoref{ch:background}.
+
+The analysis of this gossip data has been pioneered by several academic researchers. 
+Notably, \citeauthor{decker_lnresearch_2020} and Prof. Schmid
+published foundational studies~\cite{zabka_empirical_2022, zabka_short_2022}, 
+releasing a dataset of over \num{35} million gossip messages spanning 
+from the network's inception in 2018 to 2023~\cite{decker_lnresearch_2020}. 
+
+This dataset served as the empirical basis for subsequent topological research, 
+including quantitative analyses by \citeauthor{atmanaviciute_quantitative_2025}~\cite{atmanaviciute_quantitative_2025} 
+and geo-location studies by \citeauthor{valko_geolocated_2025}~\cite{valko_geolocated_2025}. 
+
+Unfortunately, this foundational dataset contains significant temporal gaps, 
+and active collection by \citeauthor{decker_lnresearch_2020} has stopped. 
+
+This lack of continuous and reliable data is the primary motivation 
+for \tech{ln-history}: to establish an independent, open-source infrastructure dedicated 
+to the persistent collection of \gls{ln} gossip. 
+
+Parallel to academic efforts, protocol engineers actively monitor gossip 
+to debug and optimize network performance. 
+For instance, \citeauthor{harvey-buschel_jharveyb_2026} developed the \tech{Gossip-Observer} tool
+to conduct 24-hour telemetry experiments, establishing simultaneous connections
+with every public node to analyse message propagation~\cite{harvey-buschel_gossip_2025}. 
+This research has been conducted at the Technical University of Berlin in 
+\citeyear{gogge_routing_2022} by \citeauthor{gogge_routing_2022}~\cite{gogge_routing_2022},
+who measured routing convergence delays within the \gls{ln}.
+ 
+Similarly, \gls{ldk} maintainer \citeauthor{mattcorallo_bluematts_2026} 
+has documented inefficiencies within the gossip protocol in the codebase~\cite{lightningdevkit_rustlightning_2025} 
+and has published network snapshots utilizing the \term{rapid-gossip-sync-server}~\cite{corallo_lightningdevkit_2025}.
+
+Finally, commercial interest in \gls{ln} data is driven by routing node operators, 
+who require accurate routing metrics to allocate capital efficiently. 
+Startups and network explorers such as \tech{mempool.space}, \tech{amboss.space}, 
+and \tech{1ML.com} provide insights into the network topology. 
+But to protect their business models, these entities often rely on closed-source 
+algorithms and proprietary historical datasets. 
+
+In contrast, \tech{ln-history} is engineered as a strictly open-source research platform. 
+By providing a transparent foundation for historical and real-time data analysis, 
+it empowers the community to drive protocol development by empirical data analysis.
+

@@ -1,0 +1,231 @@
+// --- MASTER REGISTRY ---
+Table gossip_inventory {
+  gossip_id varchar [pk]
+  type int [not null, note: '256=ChanAnn, 257=NodeAnn, 258=ChanUpd']
+  first_seen_at timestamptz [default: `now()`]
+  internal_id serial [unique, not null]
+
+  indexes {
+    (first_seen_at) [name: 'gossip_inventory_first_seen_at']
+    (type) [name: 'gossip_inventory_type']
+  }
+}
+
+// --- INFRASTRUCTURE ---
+Table collectors {
+  node_id varchar [pk]
+  alias varchar
+  first_collection_at timestamptz [default: `now()`]
+  last_collection_at timestamptz
+  total_messages_collected bigint [default: `0`]
+  notes text
+
+  indexes {
+    (alias) [name: 'collectors_alias']
+    (first_collection_at, last_collection_at) [name: 'collectors_first_collection_at_last_collection_at']
+  }
+}
+
+// --- OBSERVATIONS ---
+Table gossip_observations {
+  internal_id bigint [pk]
+  gossip_id varchar [unique, not null]
+  collector_node_id varchar [pk, unique]
+  seen_at timestamptz
+  sender_timestamp timestamptz
+
+  indexes {
+    (internal_id, collector_node_id) [name: 'gossip_observations_internal_id_collector_node_id', unique]
+    (gossip_id, collector_node_id) [name: 'gossip_observations_pkey1', unique]
+    (internal_id) [name: 'idx_obs_internal_id']
+  }
+}
+
+// --- PUBLIC NODES ---
+Table nodes {
+  node_id varchar [pk]
+  first_seen timestamptz
+  last_seen timestamptz
+
+  indexes {
+    (first_seen, last_seen) [name: 'nodes_first_seen_last_seen']
+  }
+}
+
+// --- ADDRESS NORMALIZATION ---
+Table address_types {
+  id int [pk, note: '1=IPv4, 2=IPv6, 3=TorV2, 4=TorV3, 5=DNS']
+  name varchar
+  description varchar
+}
+
+Table node_addresses {
+  id bigserial [pk]
+  gossip_id varchar
+  type_id int
+  address varchar
+  port int
+
+  indexes {
+    (address) [name: 'idx_addr_lookup']
+    (port) [name: 'node_addresses_port']
+    (type_id) [name: 'node_addresses_type_id']
+  }
+}
+
+// --- CONTENT TABLES ---
+Table node_announcements {
+  gossip_id varchar [pk]
+  node_id varchar
+  valid_from timestamptz [not null]
+  valid_to timestamptz
+  signature varchar
+  features bytea
+  rgb_color varchar
+  alias varchar
+  raw_gossip bytea
+  is_data_update boolean
+  internal_id bigint
+
+  indexes {
+    (node_id, valid_from) [name: 'idx_node_ann_backfill_fast'] 
+    (node_id, valid_to) [name: 'idx_node_ann_lookup']
+    (valid_from, valid_to) [name: 'idx_node_ann_validity']
+  }
+}
+
+Table channels {
+  gossip_id varchar [pk]
+  scid bigint [unique]
+  funding_timestamp timestamptz
+  closing_timestamp timestamptz
+  capacity_sat bigint
+  source_node_id varchar
+  target_node_id varchar
+  node_signature_1 varchar
+  node_signature_2 varchar
+  bitcoin_signature_1 varchar
+  bitcoin_signature_2 varchar
+  features bytea
+  chain_hash varchar
+  bitcoin_key_1 varchar
+  bitcoin_key_2 varchar
+  raw_gossip bytea
+  internal_id bigint
+
+  indexes {
+    (source_node_id, target_node_id) [name: 'idx_active_channels_nodes']
+    (funding_timestamp, closing_timestamp) [name: 'idx_chan_validity']
+  }
+}
+
+Table channel_updates {
+  gossip_id varchar [pk]
+  scid bigint
+  direction bit
+  valid_from timestamptz [not null]
+  valid_to timestamptz
+  signature varchar
+  chain_hash varchar
+  message_flags int
+  channel_flags int
+  cltv_expiry_delta int
+  htlc_minimum_msat bigint
+  fee_base_msat bigint
+  fee_proportional_millionths bigint
+  htlc_maximum_msat bigint
+  raw_gossip bytea
+  is_fee_update boolean
+  is_topology_update boolean
+  internal_id bigint
+
+  indexes {
+    (is_fee_update) [name: 'channel_updates_is_fee_update']
+    (is_topology_update) [name: 'channel_updates_is_topology_update']
+    (fee_base_msat, fee_proportional_millionths) [name: 'idx_chan_upd_fees']
+    (scid, direction, valid_from) [name: 'idx_chan_upd_history_order']
+    (scid, direction, valid_to) [name: 'idx_chan_upd_lookup']
+    (valid_from, valid_to) [name: 'idx_chan_upd_validity']
+    (scid, direction) [name: 'idx_updates_flags']
+  }
+}
+
+// --- CLOSURE ANALYSIS ---
+Table channel_closures {
+  gossip_id varchar [pk]
+  closing_txid varchar [not null]
+  closing_height int [not null]
+  closing_timestamp timestamptz [not null]
+  type varchar [not null]
+  settled_balance_sat bigint [not null]
+  mining_fee_sat bigint [not null]
+  output_0_sat bigint [default: `0`]
+  output_1_sat bigint [default: `0`]
+  balance_node_1_sat bigint
+  balance_node_2_sat bigint
+
+  indexes {
+    (closing_height) [name: 'channel_closures_closing_height']
+    (type) [name: 'channel_closures_type']
+    (mining_fee_sat) [name: 'idx_closures_fees']
+    (closing_timestamp) [name: 'idx_closures_ts']
+  }
+}
+
+// --- PEER OPERATIONS ---
+Table observed_peers {
+  node_id varchar [pk]
+  first_connected_at timestamptz [default: `now()`]
+  last_connected_at timestamptz
+  notes text
+
+  indexes {
+    (first_connected_at, last_connected_at) [name: 'observed_peers_first_connected_at_last_connected_at']
+  }
+}
+
+Table peer_sessions {
+  id bigserial [pk]
+  collector_node_id varchar [unique]
+  peer_node_id varchar [unique]
+  features text
+  connected_at timestamptz [not null]
+  disconnected_at timestamptz [unique]
+  termination_reason text
+
+  indexes {
+    (collector_node_id, disconnected_at) [name: 'idx_peer_sessions_active']
+    (collector_node_id) [name: 'idx_peer_sessions_range']
+    (collector_node_id, peer_node_id, disconnected_at) [name: 'one_active_session', unique]
+  }
+}
+
+Table peer_addresses {
+  id bigserial [pk]
+  session_id bigint
+  type_id int
+  address varchar
+  port int
+
+  indexes {
+    (port) [name: 'peer_addresses_port']
+    (session_id) [name: 'peer_addresses_session_id']
+    (type_id) [name: 'peer_addresses_type_id']
+  }
+}
+
+// --- RELATIONSHIPS (FOREIGN KEYS) ---
+
+Ref: channel_closures.gossip_id > channels.gossip_id
+Ref: channel_updates.gossip_id > gossip_inventory.gossip_id
+Ref: channels.gossip_id > gossip_inventory.gossip_id
+Ref: channels.source_node_id > nodes.node_id
+Ref: channels.target_node_id > nodes.node_id
+Ref: node_addresses.gossip_id > node_announcements.gossip_id
+Ref: node_addresses.type_id > address_types.id
+Ref: node_announcements.gossip_id > gossip_inventory.gossip_id
+Ref: node_announcements.node_id > nodes.node_id
+Ref: peer_addresses.type_id > address_types.id
+Ref: peer_addresses.session_id > peer_sessions.id
+Ref: peer_sessions.collector_node_id > collectors.node_id
+Ref: peer_sessions.peer_node_id > observed_peers.node_id

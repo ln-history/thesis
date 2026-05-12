@@ -1,0 +1,45 @@
+﻿table_name,column_name,constraint_type,foreign_table_name,foreign_column_name
+address_types,id,PRIMARY KEY,address_types,id
+channel_closures,gossip_id,FOREIGN KEY,channels,gossip_id
+channel_closures,gossip_id,PRIMARY KEY,channel_closures,gossip_id
+channel_updates,gossip_id,FOREIGN KEY,gossip_inventory,gossip_id
+channel_updates,gossip_id,PRIMARY KEY,channel_updates,gossip_id
+channels,gossip_id,FOREIGN KEY,gossip_inventory,gossip_id
+channels,target_node_id,FOREIGN KEY,nodes,node_id
+channels,source_node_id,FOREIGN KEY,nodes,node_id
+channels,gossip_id,PRIMARY KEY,channels,gossip_id
+channels,scid,UNIQUE,channels,scid
+collectors,node_id,PRIMARY KEY,collectors,node_id
+gossip_inventory,gossip_id,PRIMARY KEY,gossip_inventory,gossip_id
+gossip_inventory,internal_id,UNIQUE,gossip_inventory,internal_id
+gossip_observations,collector_node_id,PRIMARY KEY,gossip_observations,internal_id
+gossip_observations,internal_id,PRIMARY KEY,gossip_observations,collector_node_id
+gossip_observations,collector_node_id,PRIMARY KEY,gossip_observations,collector_node_id
+gossip_observations,internal_id,PRIMARY KEY,gossip_observations,internal_id
+gossip_observations,gossip_id,UNIQUE,gossip_observations,collector_node_id
+gossip_observations,collector_node_id,UNIQUE,gossip_observations,gossip_id
+gossip_observations,gossip_id,UNIQUE,gossip_observations,gossip_id
+gossip_observations,collector_node_id,UNIQUE,gossip_observations,collector_node_id
+node_addresses,type_id,FOREIGN KEY,address_types,id
+node_addresses,gossip_id,FOREIGN KEY,node_announcements,gossip_id
+node_addresses,id,PRIMARY KEY,node_addresses,id
+node_announcements,gossip_id,FOREIGN KEY,gossip_inventory,gossip_id
+node_announcements,node_id,FOREIGN KEY,nodes,node_id
+node_announcements,gossip_id,PRIMARY KEY,node_announcements,gossip_id
+nodes,node_id,PRIMARY KEY,nodes,node_id
+observed_peers,node_id,PRIMARY KEY,observed_peers,node_id
+peer_addresses,type_id,FOREIGN KEY,address_types,id
+peer_addresses,session_id,FOREIGN KEY,peer_sessions,id
+peer_addresses,id,PRIMARY KEY,peer_addresses,id
+peer_sessions,collector_node_id,FOREIGN KEY,collectors,node_id
+peer_sessions,peer_node_id,FOREIGN KEY,observed_peers,node_id
+peer_sessions,id,PRIMARY KEY,peer_sessions,id
+peer_sessions,collector_node_id,UNIQUE,peer_sessions,peer_node_id
+peer_sessions,disconnected_at,UNIQUE,peer_sessions,disconnected_at
+peer_sessions,peer_node_id,UNIQUE,peer_sessions,disconnected_at
+peer_sessions,collector_node_id,UNIQUE,peer_sessions,disconnected_at
+peer_sessions,disconnected_at,UNIQUE,peer_sessions,collector_node_id
+peer_sessions,peer_node_id,UNIQUE,peer_sessions,collector_node_id
+peer_sessions,collector_node_id,UNIQUE,peer_sessions,collector_node_id
+peer_sessions,peer_node_id,UNIQUE,peer_sessions,peer_node_id
+peer_sessions,disconnected_at,UNIQUE,peer_sessions,peer_node_id

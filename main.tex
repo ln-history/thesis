@@ -1,0 +1,243 @@
+\documentclass[a4paper, 12pt]{report}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{svg}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{datetime}				%makes your life with dates easier
+\usepackage{geometry}
+\usepackage{listings}
+\providecommand*{\lstlistingautorefname}{Listing}
+\usepackage{framed}					%used for framing of code listing in appendix
+\usepackage{color}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{caption}					%centering captions
+\usepackage[acronym]{glossaries}
+\usepackage{microtype}				%nicer spacing and fixes bad boxes in bibliography
+\usepackage{minted}
+\usepackage{csquotes}
+\usepackage{multirow}
+\usepackage[linesnumbered]{algorithm2e}
+\usepackage{fancyvrb} %to allow cross-referencing in verbatim text
+\usepackage{bytefield}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{tabulary}
+\usepackage{tikz}
+\usepackage{enumitem}
+
+\usepackage{colortbl}
+\usepackage{hhline}
+
+\usepackage{siunitx}
+
+
+\usepackage{hyperref}
+\usetikzlibrary{shapes.geometric, shapes.symbols, arrows.meta, positioning, calc, backgrounds,fit,positioning}
+
+%%
+% Simple Quantity,\qty{64}{\byte},64 B,Ensures a non-breaking thin space between number and unit.
+% Bits,\qty{3}{\bit},3 b,Consistent font for the unit symbol.
+% Written out,\qty[per-mode=symbol]{3}{bits},3 bits,"Useful if you prefer the word ""bits"" over ""b""."
+% Binary Prefix (IEC),\qty{10}{\kibi\byte},10 KiB,Correctly distinguishes 1024 bytes (KiB) from 1000 (KB).
+% Decimal Prefix,\qty{10}{\kilo\byte},10 kB,Standard decimal kilo (1000).
+% Ranges,\qtyrange{8}{16}{\byte},8 B to 16 B,"Handles the range word (""to"") automatically."
+%%
+
+\sisetup{
+    group-separator = {\,},
+    group-minimum-digits = 4
+}
+\DeclareSIUnit\byte{B}
+\DeclareSIUnit\bit{b}
+\DeclareSIUnit\sat{sat}
+\DeclareSIUnit\bitcoin{BTC}
+
+% \qty{64}{\byte}	64 B 
+% \qty{3}{\bit}	3 b
+% \qty{10}{\kibi\byte}	10 KiB
+% \qty{10}{\kilo\byte}  10 kB
+% \qty{50}{\bitcoin}	50 BTC
+% \qty{100000000}{\sat}	100,000,000 sat
+
+
+\sisetup{
+group-separator = {,},    % Uses comma for thousands (100,000)
+group-minimum-digits = 4  % Starts grouping at 1000 (1,000)
+}
+
+%% ASCII art
+\lstset{basicstyle={\ttfamily},literate={↓}{$\downarrow{}$}{1}}
+
+%% Tikz configuration
+\tikzset{
+    dbtable/.style={
+        draw, 
+		thick, 
+		rounded corners=2pt, 
+		inner sep=0pt, 
+		font=\footnotesize,
+        align=left, 
+    },
+    relation/.style={
+        -{Stealth[scale=1.2]}, thick, draw=gray!80
+    }
+}
+
+\usepackage{verbatimbox}
+
+%% Cusom commands for global style management
+\newcommand{\service}[1]{\texttt{#1}}
+\newcommand{\term}[1]{\textit{#1}}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\tech}[1]{\textsc{#1}}
+\newcommand{\file}[1]{\texttt{#1}}
+
+
+
+%% This declares a command \Comment
+%% The argument will be surrounded by /* ... */
+\SetKwComment{Comment}{/* }{ */}
+
+\RestyleAlgo{ruled} % to have lines around the algorithm and the caption
+
+%%%%%%%%%%%%%%%%%title%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%listins%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\usepackage[svgnames]{xcolor}
+\definecolor{diffstart}{named}{Grey}
+\definecolor{diffincl}{named}{Green}
+\definecolor{diffrem}{named}{OrangeRed}
+
+\definecolor{mygreen}{rgb}{0,0.6,0}
+\definecolor{mygray}{rgb}{0.5,0.5,0.5}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+
+\lstset{
+	backgroundcolor=\color{white},   % choose the background color
+	basicstyle=\footnotesize\ttfamily,        % size of fonts used for the code
+	breaklines=true,                 % automatic line breaking only at whitespace
+	captionpos=b,                    % sets the caption-position to bottom
+	commentstyle=\color{mygreen},    % comment style
+	escapeinside={\%*}{*)},          % if you want to add LaTeX within your code
+	keywordstyle=\color{blue},       % keyword style
+	stringstyle=\color{mymauve},	   % string literal style
+	frame=single,
+	float,
+	stepnumber=1,
+	numbers=left,
+}
+%%%%%%%%listing language for Patches
+\lstdefinelanguage{diff}{ 
+	basicstyle=\ttfamily\small,
+	morecomment=[f][\color{diffstart}]{@@},
+	morecomment=[f][\color{diffincl}]{+},
+	morecomment=[f][\color{diffrem}]{-},
+}
+
+%%%%%%%%%%%%%%%%%%bibliography
+\usepackage[backend=biber, style=ieee]{biblatex}
+%\addbibresource{resources/zotero.bib}
+\addbibresource{resources/bibliography.bib}
+
+\setcounter{biburllcpenalty}{7000}
+\setcounter{biburlucpenalty}{8000}
+
+\makenoidxglossaries
+\input{section/acronyms}
+
+\begin{document}
+	\pagenumbering{roman}
+	%\maketitle
+	\begin{titlepage} 
+		\begin{centering}
+			
+			% Header
+			\begin{figure}[!h]
+				% TU Logo
+				\begin{minipage}{0.3\linewidth}
+					\begin{center}
+						\includegraphics[scale=0.8]{resources/images/tu-logo.eps} 
+					\end{center}  
+				\end{minipage}
+                \hfill
+				% ln-history Logo
+                \begin{minipage}{0.3\linewidth}
+					\begin{center}
+						\includegraphics[scale=0.4]{resources/images/ln-history.png} 
+					\end{center}  
+				\end{minipage}
+				\hfill
+				% KBS Logo
+				\begin{minipage}{0.35\linewidth} 
+					\begin{center}
+						\includegraphics[scale=0.02]{resources/images/inet-logo.png} 
+					\end{center}    
+				\end{minipage}
+			\end{figure}
+			
+			% vertikaler Zwischenraum
+			\vspace{7mm}
+			
+			% Titel der Arbeit
+			\LARGE
+			
+			Bachelorarbeit
+			
+			\textbf{Catching Lightning in a Database:}
+            
+			An Architecture for Real-Time Gossip Preservation
+			\large
+			
+			% Name des Verfassers
+			
+			Fabian Kraus\\
+			13. Mai 2026\\[3cm]
+			
+			% Betreuer
+			\begin{minipage}{\linewidth} 
+				\begin{tabbing}
+					Betreuer: \quad \=Prof. Dr. Stefan Schmid\\ 
+					Zweitgutachter: \quad \=Prof. Dr. Stefan Tai\\
+                    Zweitbetreuer: \quad \=René Pickhardt\\
+				\end{tabbing}
+			\end{minipage}
+			
+			% vertikaler Zwischenraum
+			\vfill
+			
+			\normalsize
+			{Technische Universität Berlin}\\
+			{Faklutät IV - Elektrotechnik und Informatik}\\
+			{Institut für Telekommunikationssysteme}\\
+			{Fachgebiet Intelligent Networks}\\
+		\end{centering}
+	\end{titlepage}
+	
+	\newpage
+	\include{section/Erklaerung}
+	\newpage
+	\include{section/abstract-de}
+	\newpage
+	\include{section/abstract}
+	\tableofcontents
+	\include{section/0-Acknowledgements}
+	
+	\newpage
+	\pagenumbering{arabic}
+	\include{section/1-Introduction}
+	\include{section/2-RelatedWork}
+    \include{section/3-Background}
+    \include{section/4-Architecture}
+	\include{section/5-Analysis}
+	\include{section/6-Conclusion}
+    \include{section/7-Future_Work}
+
+    \newpage
+    \include{section/Appendix}
+
+    \printnoidxglossary[type=\acronymtype,title=Acronyms]
+
+\end{document}

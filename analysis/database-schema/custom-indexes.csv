@@ -1,0 +1,55 @@
+﻿table_name,index_name,index_definition
+address_types,address_types_pkey,CREATE UNIQUE INDEX address_types_pkey ON public.address_types USING btree (id)
+channel_closures,channel_closures_closing_height,CREATE INDEX channel_closures_closing_height ON public.channel_closures USING btree (closing_height)
+channel_closures,channel_closures_pkey,CREATE UNIQUE INDEX channel_closures_pkey ON public.channel_closures USING btree (gossip_id)
+channel_closures,channel_closures_type,CREATE INDEX channel_closures_type ON public.channel_closures USING btree (type)
+channel_closures,idx_closures_fees,CREATE INDEX idx_closures_fees ON public.channel_closures USING btree (mining_fee_sat)
+channel_closures,idx_closures_ts,CREATE INDEX idx_closures_ts ON public.channel_closures USING btree (closing_timestamp)
+channel_updates,channel_updates_is_fee_update,CREATE INDEX channel_updates_is_fee_update ON public.channel_updates USING btree (is_fee_update)
+channel_updates,channel_updates_is_topology_update,CREATE INDEX channel_updates_is_topology_update ON public.channel_updates USING btree (is_topology_update)
+channel_updates,channel_updates_pkey,CREATE UNIQUE INDEX channel_updates_pkey ON public.channel_updates USING btree (gossip_id)
+channel_updates,idx_chan_upd_fees,"CREATE INDEX idx_chan_upd_fees ON public.channel_updates USING btree (fee_base_msat, fee_proportional_millionths)"
+channel_updates,idx_chan_upd_history_order,"CREATE INDEX idx_chan_upd_history_order ON public.channel_updates USING btree (scid, direction, valid_from)"
+channel_updates,idx_chan_upd_lookup,"CREATE INDEX idx_chan_upd_lookup ON public.channel_updates USING btree (scid, direction, valid_to)"
+channel_updates,idx_chan_upd_validity,"CREATE INDEX idx_chan_upd_validity ON public.channel_updates USING btree (valid_from DESC, valid_to)"
+channel_updates,idx_updates_flags,"CREATE INDEX idx_updates_flags ON public.channel_updates USING btree (scid, direction) WHERE ((is_fee_update = true) OR (is_topology_update = true))"
+channels,channels_pkey,CREATE UNIQUE INDEX channels_pkey ON public.channels USING btree (gossip_id)
+channels,channels_scid_key,CREATE UNIQUE INDEX channels_scid_key ON public.channels USING btree (scid)
+channels,idx_active_channels_nodes,"CREATE INDEX idx_active_channels_nodes ON public.channels USING btree (source_node_id, target_node_id) WHERE (closing_timestamp IS NULL)"
+channels,idx_chan_validity,"CREATE INDEX idx_chan_validity ON public.channels USING btree (funding_timestamp, closing_timestamp)"
+collectors,collectors_alias,CREATE INDEX collectors_alias ON public.collectors USING btree (alias)
+collectors,collectors_first_collection_at_last_collection_at,"CREATE INDEX collectors_first_collection_at_last_collection_at ON public.collectors USING btree (first_collection_at, last_collection_at)"
+collectors,collectors_pkey,CREATE UNIQUE INDEX collectors_pkey ON public.collectors USING btree (node_id)
+gossip_inventory,gossip_inventory_first_seen_at,CREATE INDEX gossip_inventory_first_seen_at ON public.gossip_inventory USING btree (first_seen_at DESC)
+gossip_inventory,gossip_inventory_pkey,CREATE UNIQUE INDEX gossip_inventory_pkey ON public.gossip_inventory USING btree (gossip_id)
+gossip_inventory,gossip_inventory_type,CREATE INDEX gossip_inventory_type ON public.gossip_inventory USING btree (type)
+gossip_inventory,unique_internal_id,CREATE UNIQUE INDEX unique_internal_id ON public.gossip_inventory USING btree (internal_id)
+gossip_observations,gossip_observations_internal_id_collector_node_id,"CREATE UNIQUE INDEX gossip_observations_internal_id_collector_node_id ON public.gossip_observations USING btree (internal_id, collector_node_id)"
+gossip_observations,gossip_observations_pkey1,"CREATE UNIQUE INDEX gossip_observations_pkey1 ON public.gossip_observations USING btree (gossip_id, collector_node_id)"
+gossip_observations,idx_obs_internal_id,CREATE INDEX idx_obs_internal_id ON public.gossip_observations USING btree (internal_id)
+gossip_observations_old,gossip_observations_pkey,"CREATE UNIQUE INDEX gossip_observations_pkey ON public.gossip_observations_old USING btree (gossip_id, collector_node_id)"
+gossip_observations_old,idx_gossip_obs_lag_calc,"CREATE INDEX idx_gossip_obs_lag_calc ON public.gossip_observations_old USING btree (sender_timestamp, seen_at)"
+gossip_observations_old,idx_obs_collector,CREATE INDEX idx_obs_collector ON public.gossip_observations_old USING btree (collector_node_id)
+gossip_observations_old,idx_obs_gossip_id,CREATE INDEX idx_obs_gossip_id ON public.gossip_observations_old USING btree (gossip_id)
+gossip_observations_old,idx_obs_seen_at,CREATE INDEX idx_obs_seen_at ON public.gossip_observations_old USING btree (seen_at)
+gossip_observations_old,idx_obs_time,CREATE INDEX idx_obs_time ON public.gossip_observations_old USING btree (seen_at DESC)
+node_addresses,idx_addr_lookup,CREATE INDEX idx_addr_lookup ON public.node_addresses USING btree (address)
+node_addresses,node_addresses_pkey,CREATE UNIQUE INDEX node_addresses_pkey ON public.node_addresses USING btree (id)
+node_addresses,node_addresses_port,CREATE INDEX node_addresses_port ON public.node_addresses USING btree (port)
+node_addresses,node_addresses_type_id,CREATE INDEX node_addresses_type_id ON public.node_addresses USING btree (type_id)
+node_announcements,idx_node_ann_backfill_fast,"CREATE INDEX idx_node_ann_backfill_fast ON public.node_announcements USING btree (node_id, valid_from DESC) INCLUDE (alias, rgb_color, features, gossip_id)"
+node_announcements,idx_node_ann_lookup,"CREATE INDEX idx_node_ann_lookup ON public.node_announcements USING btree (node_id, valid_to)"
+node_announcements,idx_node_ann_validity,"CREATE INDEX idx_node_ann_validity ON public.node_announcements USING btree (valid_from DESC, valid_to)"
+node_announcements,node_announcements_pkey,CREATE UNIQUE INDEX node_announcements_pkey ON public.node_announcements USING btree (gossip_id)
+nodes,nodes_first_seen_last_seen,"CREATE INDEX nodes_first_seen_last_seen ON public.nodes USING btree (first_seen, last_seen)"
+nodes,nodes_pkey,CREATE UNIQUE INDEX nodes_pkey ON public.nodes USING btree (node_id)
+observed_peers,observed_peers_first_connected_at_last_connected_at,"CREATE INDEX observed_peers_first_connected_at_last_connected_at ON public.observed_peers USING btree (first_connected_at, last_connected_at)"
+observed_peers,observed_peers_pkey,CREATE UNIQUE INDEX observed_peers_pkey ON public.observed_peers USING btree (node_id)
+peer_addresses,peer_addresses_pkey,CREATE UNIQUE INDEX peer_addresses_pkey ON public.peer_addresses USING btree (id)
+peer_addresses,peer_addresses_port,CREATE INDEX peer_addresses_port ON public.peer_addresses USING btree (port)
+peer_addresses,peer_addresses_session_id,CREATE INDEX peer_addresses_session_id ON public.peer_addresses USING btree (session_id)
+peer_addresses,peer_addresses_type_id,CREATE INDEX peer_addresses_type_id ON public.peer_addresses USING btree (type_id)
+peer_sessions,idx_peer_sessions_active,"CREATE INDEX idx_peer_sessions_active ON public.peer_sessions USING btree (collector_node_id, disconnected_at) WHERE (disconnected_at IS NULL)"
+peer_sessions,idx_peer_sessions_range,"CREATE INDEX idx_peer_sessions_range ON public.peer_sessions USING gist (collector_node_id, tstzrange(connected_at, disconnected_at))"
+peer_sessions,one_active_session,"CREATE UNIQUE INDEX one_active_session ON public.peer_sessions USING btree (collector_node_id, peer_node_id, disconnected_at) NULLS NOT DISTINCT"
+peer_sessions,peer_sessions_pkey,CREATE UNIQUE INDEX peer_sessions_pkey ON public.peer_sessions USING btree (id)

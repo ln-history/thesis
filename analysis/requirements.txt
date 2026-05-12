@@ -1,0 +1,9 @@
+psycopg2-binary
+pandas
+matplotlib
+scipy
+python-dotenv
+jupysql
+pyarrow
+lnhistoryclient==3.7.0
+networkx

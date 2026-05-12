@@ -1,0 +1,990 @@
+\chapter{Background}
+\label{ch:background}
+
+This chapter starts off with \autoref{sec:network-protocol-background}, which introduces
+two fundamental concepts: the byte order and the \code{VarInt} data type.
+Following this, a brief introduction of the Bitcoin network, necessary to understand the \tech{ln-history} platform, is given in \autoref{sec:bitcoin-network}.
+After elaborating on the scalability limitations of the Bitcoin blockchain,
+we motivate in \autoref{sec:lightning-network} the development of the \gls{ln} as potential scaling solution.
+The Lightning Protocol is defined in the Basis of Lightning Technology (BOLT)~\cite{lightningdevelopers_bolt-3_2026}.
+In \autoref{sec:lightning-protocol}, we present the overall structure of the \gls{ln} and 
+focus on BOLT\#7, the part of the specification that defines the gossip protocol.
+In essence three different messages types: 
+\code{channel\_announcement}, \code{node\_announcement} and \code{channel\_update}
+form the foundational data for the \tech{ln-history} platform.
+As the specifications need to be implemented, we present the current existing client 
+implementations at the end in \autoref{sec:implementations}.
+
+
+\section{Network Protocol Background}
+\label{sec:network-protocol-background}
+
+\subsection{Byte Order}
+When transmitting data across a network, systems must agree on a specific \term{byte order}. 
+As defined by \citeauthor{patterson_computer_2014}~\cite{patterson_computer_2014}, 
+this is the convention a machine uses to number bytes within a word. 
+In \term{\gls{be}} format, the most significant byte is transmitted first, 
+whereas \term{\gls{le}} format transmits the least significant byte first.
+
+This distinction frequently creates friction between hardware and network engineering. 
+While modern processor architectures (such as x86 and ARM) predominantly execute in \gls{le}, 
+standard network communication protocols enforce \gls{be}~\cite{reynolds_rfc_1994}. 
+
+The Bitcoin base layer also has this architectural inconsistency: 
+its core data structures were originally optimized by \citeauthor{nakamoto_bitcoin_2008} for x86 (\gls{le}), 
+yet user-facing cryptographic identifiers, such as \code{txids}, 
+are displayed in \gls{be} to preserve the human readability of leading zeros~\cite{antonopoulos_bitcoinbook_2024}. 
+Consequently, to parse network topology accurately, any Lightning node or data ingestion platform must 
+manage endianness depending on the exact protocol layer and message field being evaluated.
+
+
+\subsection{Variable Integer (\code{VarInt})}
+The data type used for integers in Bitcoin is \gls{varint} which does not use a 
+fixed number of bits to store a value but dynamically adapts its length depending 
+on the order of magnitude of the number. 
+As detailed in ~\autoref{tab:varint_rules} values smaller than \code{0xFD} are stored in a single byte. 
+Larger values need a specific one-byte prefix (one of \code{0xFD}, \code{0xFE}, or \code{0xFF}) 
+depending on their value~\cite{antonopoulos_bitcoinbook_2024}.
+
+\begin{table}[htbp]
+    \centering
+    \caption{Encoding rules for Bitcoin Variable Length Integers.}
+    \label{tab:varint_rules}
+    \begin{tabular}{|l|l|l|}
+        \hline
+        \textbf{Value Range ($N$)} & \textbf{Prefix (1 Byte)} & \textbf{Encoded Payload} \\ \hline
+        $0 \le N \le \code{0xFC}$ & \textit{None} & $N$ (as uint8) \\ \hline
+        $\code{0xFD} \le N \le \code{0xFFFF}$ & \code{0xFD} & $N$ as \gls{le} uint16 \\ \hline
+        $\code{0x10000} \le N \le \code{0xFFFFFFFF}$ & \code{0xFE} & $N$ as \gls{le} uint32 \\ \hline
+        $N \ge \code{0x100000000}$ & \code{0xFF} & $N$ as \gls{le} uint64 \\ \hline
+    \end{tabular}
+\end{table}
+
+It is important to note that the \code{VarInt} standard in Bitcoin does not support 
+negative numbers or integers exceeding the 64-bit unsigned limit ($2^{64}$).
+
+Further details can be found directly in the codebase of the Bitcoin Core software at 
+\code{src/serialize.h}~\cite{bitcoincoredevelopers_bitcoin_2026}. 
+
+
+\section{Bitcoin}
+\label{sec:bitcoin-network}
+
+On 31st October 2008 the pseudonym Satoshi Nakamoto published the Bitcoin whitepaper 
+\citetitle{nakamoto_bitcoin_2008}~\cite{nakamoto_bitcoin_2008}.
+\citeauthor{nakamoto_bitcoin_2008} combined several existing concepts into a novel idea: 
+A digital \gls{p2p} system for trustless, borderless, and pseudonymous
+transactions using an absolutely scarce unit of account.
+
+Transactions form the foundational layer of the protocol, enabling the secure transfer of value. 
+To prevent the double-spending problem without relying on a centralized entity, 
+transactions are batched into blocks. 
+These blocks are cryptographically chained together via a Proof-of-Work consensus mechanism, 
+creating a chronological, immutable ledger of events where every 
+unit of value can be mathematically traced back to its origin.
+
+\subsection{Transaction Model}
+\label{sec:transaction}
+
+\autoref{fig:bitcoin_trasaction_visual} visualizes the concept of a bitcoin transaction.
+Unlike traditional banking systems that use account balances, 
+Bitcoin utilizes a \gls{utxo} model.
+
+\begin{figure}[htpb]
+    \centering
+    \tikzset{
+        box/.style={draw, minimum size=2em, text width=3em, text centered},
+        container/.style={draw, inner sep=20pt}
+    }
+
+    \begin{tikzpicture}[>=Triangle]
+    \foreach[evaluate={\prev=int(\i - 1)}] \i in {1, 2, 3} {
+        \node (P\i-PubKey) at (\i * 5, 0) [box, text width=5em] {Owner \i's \\ Public Key};
+        \node (P\i-Hash) [below=0.8cm of P\i-PubKey][box] {Hash};
+        \node (P\i-Sig) [below=of P\i-Hash][box, text width=5em] {Owner \prev's \\ Signature};
+        \draw [->] (P\i-Hash) -- (P\i-Sig);
+        \draw [->] (P\i-Hash.45 |- P\i-PubKey.south) -- (P\i-Hash.45);
+        \node (P\i-Tx) [fit=(P\i-PubKey)(P\i-Hash)(P\i-Sig)][container, label={[shift={(15ex,-4ex)}]north west:Transaction}]{};
+        \node (P\i-PrivKey) [below=of P\i-Tx] [box, text width=6em] {Owner \i's \\ Private Key};
+    }
+
+    \draw [->] ([xshift=-2.5cm, yshift=0.5cm]P1-Hash.north) -| ([xshift=-0.3cm]P1-Hash.north);
+
+    \foreach[evaluate={\next=int(\i + 1)}] \i in {1, 2} {
+        \draw [->, dashed] (P\i-PubKey.330) -- (P\i-PubKey.330 |- P\i-Hash.south east) -- node[sloped]{Verify} (P\next-Sig.165);
+        \draw [->, dashed] (P\i-PrivKey.15) -- node[sloped]{Sign} (P\next-Sig.195);
+        \draw [->] ([yshift=0.5cm]P\i-Hash.north -| P\i-Tx.east) -| ([xshift=-0.3cm]P\next-Hash.north);
+    }
+    \end{tikzpicture}
+    \caption{
+        Chain of ownership structure in Bitcoin.
+        Each owner transfers the coin to the next by digitally signing a hash of 
+        the previous transaction and the public key of the next owner~\cite{nakamoto_bitcoin_2008}.
+    }
+    \label{fig:bitcoin_trasaction_visual}
+\end{figure}
+
+
+In essence, a transaction consists of metadata alongside two lists: 
+a list of \term{inputs} and a list of \term{outputs}. 
+Every broadcasted transaction is uniquely identifiable by its cryptographic hash, 
+known as the \code{txid} (transaction ID). 
+An output has a specific amount of \term{satoshis} and assigns 
+a cryptographic locking script (the \code{scriptPubKey})
+determining the conditions required to spend it. 
+
+The global state of the Bitcoin network is the set of all currently existing \glspl{utxo}.
+
+To spend a \gls{utxo}, a user constructs a new transaction where the input provides 
+the exact \code{txid} and the specific index (\code{vout}) of the previous output, 
+alongside an unlocking script (a digital signature) to satisfy the cryptographic lock.
+
+
+\subsection{Timechain and Consensus}
+\label{sec:timechain}
+
+To maintain global consensus, unconfirmed transactions broadcasted to the \gls{p2p} network 
+are collected by miners and batched into discrete data structures called blocks. 
+As illustrated in \autoref{fig:timechain}, this architecture functions as a distributed timestamp server, 
+where each block includes the cryptographic hash of the previous block's timestamp, 
+creating a chronological and immutable chain.
+
+\begin{figure}[htpb]
+    \centering
+    \begin{tikzpicture}[>=Triangle]
+    \tikzset{box/.style={draw, minimum size=2em, text width=2em, text centered},
+        container/.style={draw, inner sep=20pt}
+    }
+
+    \foreach \i / \x in {0/-2, 1/4} {
+        \node (P\i-Hash) [box] at (\x, 1.5) {Hash};
+        \node (Item1) [box] at (\x - 1, 0){Item};
+        \node (Item2) [box] [right=0.3cm of Item1] {Item};
+        \node (Item3) [box] [right=0.3cm of Item2] {...};
+        \node (Container) [container] [label={[shift={(8ex,-4ex)}]north west:Block}, fit=(Item1)(Item2)(Item3)] {};
+
+        \draw [->] (Container.north west)+(1, 0) |- ([yshift=-4]P\i-Hash.west);
+    }
+
+    \draw [<-] ([yshift=4]P0-Hash.west) --+ (-3, 0);
+    \draw [->] ([yshift=4]P0-Hash.east) -- ([yshift=4]P1-Hash.west);
+    \draw [->] ([yshift=4]P1-Hash.east) --+ (3, 0);
+    \end{tikzpicture}
+    \caption{
+        The abstract concept of the distributed timestamp server. 
+        Diagram recreated based on \citeauthor{nakamoto_bitcoin_2008}~\cite{nakamoto_bitcoin_2008}.
+    }
+    \label{fig:timechain}
+\end{figure}
+
+To secure this timechain against tampering, Bitcoin employs a Proof-of-Work consensus mechanism. 
+As detailed in \autoref{fig:proof-of-work}, miners must expend computational energy in the physical world 
+to find a valid \code{hash} that satisfies the network's difficulty target. 
+Once a valid block is mined and appended to this chain of blocks, hence blockchain, the transactions within it are considered 
+confirmed\footnote{Because blockchain reorganizations (\term{reorgs}) can occasionally occur due to network latency, 
+\citeauthor{nakamoto_bitcoin_2008} mathematically showed that waiting for a transaction to be six blocks 
+deep provides probabilistic finality~\cite[Section~11]{nakamoto_bitcoin_2008}.}.
+
+\begin{figure}[htpb]
+    \centering
+    \begin{tikzpicture}[>=Triangle]
+    \tikzset{box/.style={draw, minimum size=2em, text centered},
+        container/.style={inner sep=20pt}
+    }
+
+    \foreach \i / \x in {0/-3, 1/3} {
+        \node (P\i-PrevHash) [box] at (\x, 1) {Prev Hash};
+        \node (Nonce) [box] [right=0.3cm of P\i-PrevHash] {Nonce};
+        \node (Tx1) [box] [below=0.3cm of P\i-PrevHash]{Tx};
+        \node (Tx2) [box] [right=0.3cm of Tx1] {Tx};
+        \node (Tx3) [box] [right=0.3cm of Tx2] {...};
+        \node (P\i-Container) [container] [label={[shift={(8ex,-4ex)}]north west:Block}, fit=(P\i-PrevHash)(Tx1)(Tx2)(Tx3)] {};
+        \draw (P\i-Container.north west) -- (P\i-Container.south west) -- (P\i-Container.south east) -- (P\i-Container.north east);
+    }
+
+    \draw [<-] (P0-PrevHash.west) --+ (-2, 0);
+    \draw [->] (P0-Container.east |- P1-PrevHash.west) -- (P1-PrevHash.west);
+    \end{tikzpicture}
+    \caption{
+        The Proof-of-Work blockchain architecture, illustrating how transaction batches are cryptographically chained using the previous block's hash and a valid Nonce. Diagram recreated based on Nakamoto~\cite{nakamoto_bitcoin_2008}.
+    }
+    \label{fig:proof-of-work}
+\end{figure}
+
+Since these blocks are strictly ordered and the transactions within a block are sequentially listed, 
+any confirmed output in the Bitcoin network can be deterministically located. 
+This forms a three-dimensional tuple: 
+the \term{block height}, the \term{transaction index} within that block, and the \term{output index} (\code{vout}) within that transaction. 
+As will be detailed in later chapters, the \gls{ln} leverages this tuple,
+encoded as a \code{short\_channel\_id}, to concisely identify and verify the existence of payment channels on the base layer.
+
+
+\section{Scalability of Bitcoin}
+
+By design, the Bitcoin protocol limits the size of each block to ensure that running 
+a fully validating node remains computationally accessible to the public, thereby preserving network decentralization. 
+Originally, a strict \qty{1}{\mega\byte} storage limit was enforced. 
+As global adoption increased, this hard limit created a severe bottleneck in transaction throughput, 
+leading to highly congested mempools and surging transaction fees.
+
+These scalability challenges triggered a conflict known as the \enquote{Blocksize War}~\cite{bier_blocksize_2021}. 
+A group of corporate entities and mining pools advocated for a \term{hard-fork} to increase the block size, 
+while independent researchers and protocol developers argued for maintaining the limit and scaling via layered architectural upgrades. 
+
+The developers' approach ultimately succeeded, resulting in the 2017 activation of 
+a backwards-compatible soft-fork known as Segregated Witness (\term{SegWit}).
+
+SegWit fundamentally reorganized transaction data by separating
+the cryptographic signatures (the witness) from the transaction inputs. 
+Most importantly for Layer-2 scalability, SegWit eliminated third-party \term{transaction malleability},
+a vulnerability where an attacker could alter a \code{txid} before it was confirmed. 
+By fixing this, SegWit finally made it secure to chain unconfirmed transactions together.
+
+Furthermore, the protocol relies on \glspl{htlc}, 
+which are specialized Bitcoin scripts that lock funds using hash preimages and time expirations. 
+Together with the activation of SegWit, these changes laid the 
+foundation for a scalable, off-chain payment network: the Lightning Network.
+
+
+\section{Bitcoin Lightning Network}
+\label{sec:lightning-network}
+
+The Bitcoin Lightning Network (LN) was first proposed in 2016 by \citeauthor{poon_bitcoin_2016} 
+in their whitepaper, \citetitle{poon_bitcoin_2016}~\cite{poon_bitcoin_2016}. 
+Designed as a Layer-2 scaling solution, the \gls{ln} mitigates the throughput limitations
+of the Bitcoin blockchain by shifting the majority of transaction volume \term{off-chain}. 
+This architecture significantly conserves scarce block space while continuing
+to inherit the robust, decentralized security model of the underlying network.
+
+The fundamental building blocks of this off-chain network are \term{payment channels}. 
+Technically, a payment channel is a 2-of-2 multisignature transaction, referred to as \term{funding transaction}, 
+broadcasted to the Bitcoin base layer. 
+Once this channel is established, the two participating nodes can exchange transactions 
+by continuously signing and exchanging new \term{commitment transactions} that update the distribution of the locked funds. 
+Because of SegWit, these unconfirmed state updates can be exchanged securely 
+and trustlessly without requiring immediate on-chain settlement.
+
+To make individual payment channels function as a globally routable payment network, 
+nodes must follow a set of communication and cryptographic standards. 
+In the following section, we elaborate on the protocol specifications, known as \glspl{bolt}. 
+We specifically focus on the gossip protocol that forms the data foundation for the \tech{ln-history} platform.
+We finish with an overview of the client software that implement these standards.
+
+\section{Lightning Protocol: BOLT}
+\label{sec:lightning-protocol}
+
+The technical specifications of the \gls{ln} are formalized as the BOLTs~\cite{lightningdevelopers_lightning_2018}. 
+Currently, comprising twelve documents BOLT\#1 through BOLT\#12, 
+these standards ensure interoperability across different client implementations. 
+Because the \tech{ln-history} platform is fundamentally designed to parse and store network topology data, 
+we first introduce the protocol's core data primitives (\autoref{sec:lightning-data-model}) 
+before detailing the specific gossip messages used for network discovery.
+
+
+\subsection{Data Model}
+\label{sec:lightning-data-model}
+
+\subsubsection{Type-Length-Value Records (TLV)}
+To ensure backwards compatibility and allow for continuous protocol upgrades, 
+Lightning messages extensively utilize \gls{tlv} streams. 
+Rather than relying on immutable data structures, messages append optional fields using the format illustrated in \autoref{fig:tlv_record}.
+
+\begin{figure}[htbp]
+    \centering
+    \renewcommand{\arraystretch}{1.5} 
+    
+    \begin{tabular}{|c|c|c|}
+        \hline
+        % Row 1: The Field Names
+        \textbf{Type} & \textbf{Length} & \textbf{Value} \\
+        
+        % Row 2: The Encoding / Size
+        \small \textit{\gls{varint}} & \small \textit{\gls{varint}} & \small \textit{Variable ($N$ bytes)} \\
+        \hline
+    \end{tabular}
+    \caption{
+        Structure of a single TLV Record. 
+        The \term{Value} field's size is determined by the integer in the \term{Length} field.
+    }
+    \label{fig:tlv_record}
+\end{figure}
+
+A \gls{tlv} record consists of a \term{Type} identifier and a \term{Length} indicator, 
+both encoded as \gls{varint}, followed by the actual \term{Value} payload. 
+Types below $2^{16}$ are reserved for official BOLT specifications, 
+while higher values are available for custom or experimental application data~\cite{lightningdevelopers_lightning_2018}. 
+By concatenating multiple records into a stream, nodes can safely parse known fields and 
+safely ignore unrecognized types without breaking message decoding.
+
+
+\subsubsection{Short Channel ID (\code{scid})}
+
+As introduced in \autoref{sec:timechain}, 
+payment channels are anchored to the Bitcoin base layer via a funding transaction. 
+The \gls{scid} provides a compact, unique identifier for these channels 
+by encoding their exact on-chain location into an \qty{8}{\byte} integer~\cite{lightningdevelopers_lightning_2018}.
+
+The structure consists of the \term{block height} (\qty{3}{\byte}), 
+the \term{transaction index} within that block (\qty{3}{\byte}), 
+and the \term{output index} (\qty{2}{\byte}). 
+For human readability, these three components are printed as decimal numbers separated by an \code{x}. 
+For example, a \gls{scid} of \code{539268x845x1} indicates a channel funded in block \num{539268}, 
+at transaction index \num{845}, utilizing output \num{1}\footnote{Early versions of the \gls{cln} 
+implementation used a colon (\code{:}) as a separator, but this was standardized to \code{x} 
+within the formal BOLT specifications~\cite{user1692333_how_2022}.}.
+
+
+\subsection{Messaging: BOLT\#1}
+\label{sec:lightning-message}
+
+After introducing the core data primitives, we now examine how nodes actually communicate. 
+The foundational specification is BOLT\#1 that outlines the base protocol 
+for connection and data exchange within the \gls{ln}. 
+Because all communication over the network is strictly encrypted and authenticated, 
+the protocol formally defines a plaintext \term{Lightning Message Format} that 
+emerges only after a packet is decrypted~\cite{lightningdevelopers_bolts_2018b}. 
+
+\begin{figure}[htbp]
+    \centering
+    \begin{bytefield}[bitwidth=1.1em, endianness=big]{16}
+        
+        \bitheader{0, 15} \\
+        
+        %  Type (2 bytes = 16 bits) 
+        \bitbox{16}{Type (2 Bytes)} \\
+        
+        %  Payload (Variable Length) 
+        \wordbox[lrt]{1}{Payload (Variable Length)} \\
+        \wordbox[lrb]{1}{\footnotesize \textit{Conforms to format matching the Type}} \\
+        
+        %  Extension (Variable Length / Optional) 
+        \wordbox{2}{Extension (Optional TLV Stream)}
+        
+    \end{bytefield}
+    \caption{Structure of a Lightning Message. \cite[section ~Lightning Message Format]{lightningdevelopers_lightning_2018}}
+    \label{fig:lightning_message}
+\end{figure}
+
+
+As shown in \autoref{fig:lightning_message}, every parsed message follows to a hierarchical structure. 
+The message always begins with a \qty{2}{\byte} \term{Type} field (encoded as a \gls{varint} integer),
+which acts as an identifier to dictate how the subsequent variable-length \term{Payload} must be parsed. 
+Finally, to ensure future protocol extensibility, messages may optionally conclude with a \gls{tlv} stream.
+
+
+
+\subsection{P2P Node and Channel Discovery: BOLT\#7}
+\label{sec:gossip-messages}
+
+The discovery of nodes and channels which form the topology of the \gls{ln} does not rely on any third party. 
+Instead, nodes use \term{(Public) Gossip Messages} which are \term{Lightning Messages} 
+of type \code{256}, \code{257} or \code{258} and defined in ~\cite{lightningdevelopers_bolts_2018a}. 
+The gossip protocol serves two objectives
+
+\begin{enumerate}
+    \item \textbf{Peer discovery:} 
+        Every node has the properties \code{node\_id}, \code{alias}, \code{color}, 
+        and a list of \code{addresses} that other nodes can use to connect to.
+    \item \textbf{Channel discovery:} 
+        Every node creates and maintains its own (local) view 
+        of the topology of the \gls{ln}, necessary for path finding and routing.
+\end{enumerate}
+
+To fulfil these objectives, the protocol defines three distinct message types:
+
+Firstly, the \code{channel\_announcement} (type \code{256}) establishes the topological link between two peers. 
+It binds the participating nodes (\code{node\_id\_1} and \code{node\_id\_2}) to a specific on-chain \gls{scid}. 
+To prevent malicious actors from spamming the network with fake topology data, 
+this message requires four distinct cryptographic signatures (from both the node keys and the underlying Bitcoin funding keys). 
+This guarantees that the announced channel is genuinely anchored to a confirmed Bitcoin transaction.
+
+Secondly, the \code{node\_announcement} (type \code{257}) is broadcasted by individual nodes to declare their network reachability. 
+It provides the necessary routing \code{addresses} alongside the node's metadata. 
+To mitigate spam, the protocol mandates that a node may only broadcast this message 
+after it has successfully verified and announced at least one public channel.
+
+Thirdly, the \code{channel\_update} (type \code{258}) informs the network about 
+the operational and economic policies of an established channel. 
+Because \gls{ln} channels are bidirectional, each participating node broadcasts its own update to 
+independently set the routing fees (base and proportional) and timelock requirements (\term{HTLC} minimums and maximums) 
+for its specific forwarding direction. 
+These updates make up the vast majority of network traffic as nodes continuously adjust their fee policies to manage their liquidity.
+
+
+\subsubsection{Channel Announcement}
+\label{sec:channel-announcement}
+
+The \code{channel\_announcement} message broadcasts the existence of 
+a newly established, public channel to the \gls{ln}. 
+It links the founding Lightning nodes to the on-chain funding transaction that backs their channel. 
+The structure of the message payload is defined by the BOLT specification and is illustrated in \autoref{fig:channel_announcement}.
+
+\begin{figure}[htbp]
+    \centering
+    % 32-bit width
+    \begin{bytefield}[bitwidth=1.1em, endianness=big]{32}
+        \bitheader{0, 15, 16, 31} \\
+        
+        % Type Header 
+        \wordbox{1}{\code{type} (2 bytes, value: 256)} \\
+
+        % Signatures 
+        \wordbox[lrt]{1}{4 $\times$ 64-byte signatures} \\
+        \wordbox[lrb]{1}{\code{node\_sig\_1}, \code{node\_sig\_2}, \code{bitcoin\_sig\_1}, \code{bitcoin\_sig\_2}} \\
+        
+        % Features 
+        \bitbox{16}{\code{len} (2 bytes)} & \bitbox{16}{\code{features} (\code{len} bytes)} \\
+        
+        % Chain Hash 
+        \wordbox{1}{\code{chain\_hash} (32 bytes)} \\
+        
+        % SCID 
+        \wordbox{2}{\code{short\_channel\_id} (8 bytes)} \\
+
+        % Node IDs 
+        \wordbox{1}{\code{node\_id\_1} (33 bytes)} \\
+        \wordbox{1}{\code{node\_id\_2} (33 bytes)} \\
+        
+        % Bitcoin Keys
+        \wordbox{1}{\code{bitcoin\_key\_1} (33 bytes)} \\
+        \wordbox{1}{\code{bitcoin\_key\_2} (33 bytes)}
+        
+    \end{bytefield}
+    \caption{
+        Byte layout of the \code{channel\_announcement} message. 
+        Large fields are shown as blocks~\cite[Section~channel\_announcement]{lightningdevelopers_lightning_2018}.
+    }
+    \label{fig:channel_announcement}
+\end{figure}
+
+The fields are defined as follows:
+\begin{description}
+    \item[Signatures] 
+        Four \qty{64}{\byte} cryptographic signatures. 
+        Together, they prove that both Lightning nodes agree on the channel and 
+        that they own the associated on-chain funding outputs. 
+    
+    \item[\code{features}] 
+        A \gls{varint} bitfield used to signal supported protocol extensions (defined in BOLT\#9~\cite{lightningdevelopers_bolts_2018}). 
+        This ensures forward compatibility, allowing older nodes to process announcements from newer nodes without breaking network consensus.
+
+    \item[\code{chain\_hash}] 
+        A \qty{32}{\byte} unique identifier for the underlying blockchain, 
+        represented as the hash of the chain's genesis block encoded in \gls{le} 
+        format\footnote{For instance, the \code{chain\_hash} for the Bitcoin Mainnet is 
+        \code{6fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000}~\cite{lightningdevelopers_lightning_2018}.}. 
+        This prevents channels established on testnets or forks from being maliciously announced on the main network.
+
+    \item[\code{short\_channel\_id}] 
+        The \qty{8}{\byte} base-layer tuple (\term{block height}, \term{transaction index}, and \term{output index}) 
+        mapping exactly to the channel's funding transaction.
+
+    \item[\code{node\_id}] 
+        The \qty{33}{\byte} compressed public keys of the two participating Lightning nodes. 
+        To ensure a deterministic message format and prevent peers from broadcasting duplicate announcements by swapping the fields, 
+        \code{node\_id\_1} must be lexicographically strictly less than \code{node\_id\_2}.  
+
+    \item[Bitcoin Keys] 
+        The \qty{33}{\byte} compressed public keys utilized in the 2-of-2 multisignature transaction. 
+        These are distinct from the Lightning \code{node\_id} keys and are required to verify the on-chain Bitcoin signatures.
+\end{description}
+
+
+\subsubsection{Node Announcement \code{257}}
+
+The \code{node\_announcement} message allows a node to advertise its presence, metadata, and connectivity details to the \gls{ln}.
+The protocol specifies the byte layout shown in \autoref{fig:node_announcement}.
+
+\begin{figure}[htbp]
+    \centering
+    % 32-bit width
+    \begin{bytefield}[bitwidth=1.1em, endianness=big]{32}
+        \bitheader{0, 15, 16, 31} \\
+        
+        % Type 
+        \wordbox{1}{\code{type} (2 bytes, value: 257)} \\
+        
+        % Signature 
+        \wordbox{2}{\code{signature} (64 bytes)} \\
+        
+        % Features 
+        \bitbox{16}{\code{flen} (2 bytes)} & \bitbox{16}{\code{features} (\code{flen} bytes)} \\
+        
+        % Timestamp 
+        \wordbox{1}{\code{timestamp} (4 bytes)} \\
+        
+        % ID 
+        \wordbox{1}{\code{node\_id} (33 bytes)} \\
+        
+        % Color & Alias 
+        \wordbox{1}{\code{rgb\_color} (3 bytes)} \\
+        \wordbox{1}{\code{alias} (32 bytes)} \\
+        
+        % Addresses 
+        \wordbox{1}{\code{addrlen} (2 bytes)} \\
+        \wordbox{1}{\code{addresses} (\code{addrlen} bytes)}
+    \end{bytefield}
+    \caption{
+        Byte layout of the \code{node\_announcement} message. 
+        Large fields are shown as blocks~\cite[Section~node\_announcement]{lightningdevelopers_lightning_2018}.
+    }
+    \label{fig:node_announcement}
+\end{figure}
+
+The fields are defined as follows:
+\begin{description}
+    \item[\code{signature}] 
+        A \qty{64}{\byte} cryptographic signature over the message hash. 
+        This proves that the message originated from the exact \code{node\_id} being announced, 
+        preventing peers from spoofing a node's routing configuration.
+    
+    \item[\code{features}] 
+        A \gls{varint} bitfield (dictated by \code{flen}) used to signal supported protocol extensions. 
+        As with \code{channel\_announcements}, this ensures forward compatibility across the network.
+    
+    \item[\code{timestamp}] 
+        A \qty{4}{\byte} Unix timestamp. 
+        Because nodes dynamically update their network addresses and configurations, 
+        this timestamp allows peers to strictly order incoming updates and safely discard stale announcements.
+
+    \item[\code{node\_id}] 
+        The \qty{33}{\byte} compressed public key that cryptographically identifies the announcing node on the \gls{ln}.
+    
+    \item[\code{alias} and \code{rgb\_color}] 
+        Metadata allowing operators to customize their node's display name (\tech{UTF-8} encoded) and visual appearance in network explorers. 
+        Because these values are entirely arbitrary and unauthenticated, they offer no security guarantees and could be used for impersonation attacks.
+    
+    \item[\code{addresses}] 
+        A \gls{varint} field (dictated by \code{addrlen}) specifying the network transport protocols available for connection. 
+        A node may advertise multiple addresses simultaneously, supporting 
+        IPv4, IPv6, Tor (v2 and v3) onion services, and DNS hostnames~\cite[Section~node\_announcement]{lightningdevelopers_lightning_2018}.
+\end{description}
+
+
+
+\subsubsection{Channel Update \code{258}}
+
+Because \gls{ln} channels are bidirectional, routing policies are managed independently for each direction. 
+The direction routing from \code{node\_id\_1} to \code{node\_id\_2} is designated as direction \code{0}, 
+while the reverse is designated as direction \code{1}. 
+After a channel is established, each participant independently broadcasts a \code{channel\_update} message 
+to specify their respective fee structure and operational limits~\cite[Section~channel\_update]{lightningdevelopers_lightning_2018}.
+
+\begin{figure}[htbp]
+    \centering
+    % 32-bit width (4 bytes per row)
+    \begin{bytefield}[bitwidth=1.1em, endianness=big]{32}
+        
+        \bitheader{0,15,16,31} \\
+        
+        % Type 
+        \wordbox{1}{\code{type} (2 bytes, value: 258)} \\
+        
+        % Signature 
+        \wordbox{2}{\code{signature} (64 bytes)} \\
+        
+        % Chain Hash 
+        \wordbox{1}{\code{chain\_hash} (32 bytes)} \\
+        
+        % SCID (8 bytes = 2 rows) 
+        \wordbox{2}{\code{short\_channel\_id} (8 bytes)} \\
+        
+        % Timestamp 
+        \wordbox{1}{\code{timestamp} (4 bytes)} \\
+        
+        % Flags (1 + 1 + 2 = 4 bytes) 
+        \bitbox{8}{\code{msg\_flags} (1 B)} & \bitbox{8}{\code{ch\_flags} (1 B)} & \bitbox{16}{\code{cltv\_expiry\_delta} (2 B)} \\
+        
+        % Values (u64 = 8 bytes = 2 rows) 
+        \wordbox{2}{\code{htlc\_minimum\_msat} (8 bytes)} \\
+        \wordbox{1}{\code{fee\_base\_msat} (4 bytes)} \\
+        \wordbox{1}{\code{fee\_prop\_millionths} (4 bytes)} \\
+        \wordbox{2}{\code{htlc\_maximum\_msat} (8 bytes)}
+        
+    \end{bytefield}
+    \caption{
+        Byte layout of the \code{channel\_update} message. 
+        Large fields are shown as blocks~\cite[Section~channel\_update]{lightningdevelopers_lightning_2018}.
+    }
+    \label{fig:channel_update}
+\end{figure}
+
+\begin{description}
+    \item[Signature] 
+        One \qty{64}{\byte} signatures prove that the message has been sent by the nodes that 
+        participate in the channel that the update belongs to.
+
+    \item[Metadata] 
+        Contains the \code{timestamp} to order updates, the \code{chain\_hash} indicates the correct network and 
+        the \code{\gls{scid}} identifies the channel to update.
+
+    \item[Flags] 
+        Bitfields containing control information. 
+        The most important is the \code{direction} bit (in \code{channel\_flags}), 
+        which signals if the update applies to \code{node\_1} $\rightarrow$ \code{node\_2} or the reverse. 
+        The \code{disable} bit can be used to temporarily disable the channel.
+    
+    \item[Fee Policy] 
+        Consists of two parameters: \code{fee\_base\_msat} and \code{fee\_proportional\_millionths}. 
+        A payment with an amount of $n$\,\unit{\milli\sat} needs to pay a fee following the calculation of \autoref{eq:fee_policy}.
+    \begin{align}
+        Fee(n) = \code{fee\_base\_msat} + \left( n \cdot \frac{\code{fee\_prop\_millionths}}{1\,000\,000} \right)
+        \label{eq:fee_policy}
+    \end{align}
+
+    \item[\gls{htlc} Limits] 
+        The \code{cltv\_expiry\_delta} defines the required time-lock buffer. 
+        The \code{htlc\_minimum\_msat} and \code{htlc\_maximum\_msat} fields define 
+        the smallest and largest payment sizes allowed to pass through this channel, respectively.
+\end{description}
+
+
+\subsection{Gossip Synchronization and Queries}
+\label{sec:gossip-queries}
+
+While the announcement and update messages described above contain the actual topological data of the \gls{ln}, 
+nodes require a standardized mechanism to request this data. 
+When a node bootstraps or reconnects after being offline, 
+it must synchronize its local graph with the network to ensure its routing tables are accurate. 
+
+To facilitate this, BOLT\#7 defines a suite of query messages that allow nodes to request 
+targeted subsets of the gossip data rather than downloading 
+the entire network history unnecessarily~\cite[Section~Query Messages]{lightningdevelopers_lightning_2018}.
+
+We divide the query messages into their two-step synchronization workflow:
+
+\begin{enumerate}
+    \item \textbf{Macro-Synchronization (\code{query\_channel\_range}):} 
+        A node first asks a peer for all active channels created within a specific window of Bitcoin blocks. 
+        The peer responds with a \code{reply\_channel\_range} message, returning a compressed array of \glspl{scid} 
+        that match the requested timeframe.
+    \item \textbf{Micro-Synchronization (\code{query\_short\_channel\_ids}):} 
+        Once the requesting node has the list of \glspl{scid}, it compares them against its local database. 
+        For any missing or outdated channels, it sends a \code{query\_short\_channel\_ids} message 
+        to explicitly request the exact \code{channel\_announcement} and \code{channel\_update} payloads for those specific channels.
+\end{enumerate}
+
+
+\section{Bitcoin Lightning Implementations}
+\label{sec:implementations}
+
+There are several (commercial) companies as well as organizations that have 
+implemented the described specifications, each with their own technology and different focus,
+but all have their codebase open-sourced.
+As the following \autoref{tab:lightning-nodes-implementation} shows, there are, as of writing, 
+four working implementations and one getting build.
+
+\begin{table}[htpb]
+    \centering
+    \caption{Comparison of major Bitcoin Lightning Network implementations.}
+    \label{tab:lightning-nodes-implementation}
+    \renewcommand{\arraystretch}{1.4}
+    \begin{tabular}{@{} l l l c @{}}
+        \toprule
+        \textbf{Implementation} & 
+        \begin{tabular}{@{}l@{}}\textbf{Primary} \\ \textbf{Language}\end{tabular} & 
+        \begin{tabular}{@{}l@{}}\textbf{Lead} \\ \textbf{Maintainer}\end{tabular} & 
+        \textbf{Est.} \\
+        \midrule
+        \textbf{\gls{lnd}} & Go & Lightning Labs & 2016 \\
+        \textbf{Core Lightning (CLN)} & C & Blockstream & 2015 \\
+        \textbf{Eclair} & Scala & ACINQ & 2015 \\
+        \textbf{\gls{ldk}} & Rust & Spiral & 2019 \\
+        \textbf{NLightning} & C\# .NET & N\'{i}ckolas Goline & 2024 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\paragraph{\gls{lnd}}
+Developed by Lightning Labs in Go, \gls{lnd}~\cite{lnddeveloper_lightningnetwork_2026} 
+is currently the most widely deployed node implementation on the network. 
+Its design focuses on enterprise tooling, featuring a developer-friendly architecture with extensive gRPC and REST APIs.
+
+\paragraph{\gls{cln}}
+Maintained primarily by Blockstream, \gls{cln}~\cite{corelightningdevelopers_elementsproject_2026} 
+is written in C and follows a UNIX-style philosophy. 
+It separates distinct node functions into isolated daemons, 
+making it lightweight with a flexible, multi-language plugin system.
+
+\paragraph{Eclair}
+Built by ACINQ in Scala, Eclair~\cite{eclairdevelopers_acinq_2026} 
+is an enterprise-grade node engineered specifically to handle high-volume routing. 
+It is optimized for native mobile integrations and serves as the backbone for 
+ACINQ's Phoenix wallet, which shows its capabilities in managing asynchronous connectivity for light clients.
+
+\paragraph{\gls{ldk}}
+Unlike standalone node daemons, the \gls{ldk}~\cite{ldkdevelopers_lightningdevkit_2026}, 
+managed by Spiral, is a modular, Rust-based development toolkit. 
+It gives engineers a flexible API to embed custom Lightning capabilities directly 
+into existing applications and wallets, removing the operational overhead of managing a full, localized routing node.
+
+\paragraph{NLightning}
+is the newest addition to the ecosystem. NLightning~\cite{goline_ngoline_2026} 
+is an actively developing C\# .NET implementation of the BOLT specifications. 
+It aims to provide a robust, enterprise-ready implementation designed for 
+critical usage within the broader .NET developer ecosystem.
+
+
+While all implementations successfully execute the BOLT specifications, 
+their different architectures make them suitable for different tasks. 
+For the purpose of raw gossip data collection, the \gls{cln} implementation presents many advantages. 
+Its UNIX-style separation of daemons and its extensible plugin architecture allows 
+hooking directly into the node's internal event streams without needing to modify any software. 
+Because this design enables real-time access to raw \gls{p2p} gossip messages, 
+\gls{cln} serves as the implementation of choice for the \tech{ln-history} platform's data collection.
+This will be detailed in the following chapter (\autoref{ch:architecture}).
+
+
+
+
+
+\iffalse
+It is further necessary to specify the 
+As soon as a transaction is incorporated into a valid Bitcoin block, meaning a miner has broadcasted a block with a valid block-hash, 
+the transaction changes its previously \gls{utxo} to so-called \textit{Spent Transaction Outputs}. Each transaction output represents an amount of bitcoin.
+Transactions in their "raw form" can be displayed in hex as seen in \autoref{lst:first-transaction-hex}. 
+To better understand this important concept we analyse the very first bitcoin transaction (that was not a coinbase transaction) which occured in block 170 where Satoshi Nakamoto transferred $\si{10}{BTC}$ to Hal Finney.
+\begin{listing}[H]
+\begin{minted}[
+    breaklines=true, 
+    breakanywhere=true,
+    frame=single, 
+    bgcolor=black!5,
+    fontsize=\small
+]{text}
+> bitcoin-cli getrawtransaction f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16
+
+0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000
+\end{minted}
+\caption{Retrieving the raw transaction data by txid via bitcoin-cli.}
+\label{lst:first-transaction-hex}
+\end{listing}
+
+Following the bitcoin protocol this long string of byte data can be organized into 'standardized' fields.
+There are three different types of field.
+The fixed length, variable length and. 
+Fixed length means that there is a pre-set number of bytes allowed for that field .
+Variable Length.
+
+The first $\si{4}{B}$ are always the version. Parsing of 01000000 needs to be done using little-endian yielding version: 1.
+Next the number of inputs is one byte $01$ meaning 1.
+Next $\si{32}{B}$ is the transactionID (c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704) always fixed which must be parsed as little endian yielding to: 0437cd7f8525ceed2324359c2d0ba26006d92d856a9c20fa0241106ee5a597c9
+This is followed by the output number which is always a fixed 8-byte: 0000000048473044 which cields to 
+()
+
+\begin{table}[htpb]
+    \centering
+    \caption{Hexadecimal breakdown of the first transaction from Satoshi to Hal Finney.}
+    \label{tab:tx-hex-breakdown}
+    \renewcommand{\arraystretch}{1.3}
+    \begin{tabularx}{\textwidth}{|>{\ttfamily\footnotesize\raggedright\arraybackslash}p{3.5cm}|>{\raggedright\arraybackslash}X|l|l|}
+        \hline
+        \rowcolor{black!10}
+        \textbf{Raw Hex Segment} & \textbf{Field Description} & \textbf{Data Type} & \textbf{Size} \\ \hline
+        01000000 & \textbf{Version:} 1 & Fixed & 4 Bytes \\ \hline
+        01 & \textbf{Input Count:} 1 & CompactSize & 1 Byte \\ \hline
+        \multicolumn{4}{|c|}{\cellcolor{blue!10}\textbf{Input 0 (from previous Satoshi transaction)}} \\ \hline
+        c997a5e5...7fcd3704 & \textbf{Previous TXID:} (Internal little-endian order) & Fixed & 32 Bytes \\ \hline
+        00000000 & \textbf{Previous Output Index:} 0 & Fixed & 4 Bytes \\ \hline
+        48 & \textbf{Script Length:} 72 Bytes & CompactSize & 1 Byte \\ \hline
+        47304402...1d0901 & \textbf{ScriptSig:} Unlocking script (Signature) & Variable & 72 Bytes \\ \hline
+        ffffffff & \textbf{Sequence:} Standard final sequence & Fixed & 4 Bytes \\ \hline
+        02 & \textbf{Output Count:} 2 & CompactSize & 1 Byte \\ \hline
+        \multicolumn{4}{|c|}{\cellcolor{green!10}\textbf{Output 0 (10 BTC Transferred to Hal Finney)}} \\ \hline
+        00ca9a3b00000000 & \textbf{Amount:} $10 \text{ BTC} = 10^9 \text{ sats}$ ($3b9aca00_{16}$) & Fixed & 8 Bytes \\ \hline
+        43 & \textbf{Script Length:} 67 Bytes & CompactSize & 1 Byte \\ \hline
+        4104ae1a...d84cac & \textbf{ScriptPubKey:} P2PK Locking script & Variable & 67 Bytes \\ \hline
+        \multicolumn{4}{|c|}{\cellcolor{red!10}\textbf{Output 1 (40 BTC Change returned to Satoshi)}} \\ \hline
+        00286bee00000000 & \textbf{Amount:} $40 \text{ BTC} = 4 \times 10^9 \text{ sats}$ ($ee6b2800_{16}$) & Fixed & 8 Bytes \\ \hline
+        43 & \textbf{Script Length:} 67 Bytes & CompactSize & 1 Byte \\ \hline
+        410411db...12a3ac & \textbf{ScriptPubKey:} P2PK Locking script & Variable & 67 Bytes \\ \hline
+        00000000 & \textbf{Locktime:} 0 & Fixed & 4 Bytes \\ \hline
+    \end{tabularx}
+\end{table}
+
+
+\subsubsection{Query and Reply Messages}
+
+A node needs to request its peers to receive new gossip messages. Likewise a peer needs to respond to those \term{Query Messages} using their adequate reply. In \code{BOLT 07} there are three \term{request} and two \term{reply messages} specified and shown in \autoref{tab:gossip-query-reply-bolt-07}.
+
+\begin{table}[htbp]
+    \centering
+    
+    % Define 4 columns: Request Type, Request Name, Reply Type, Reply Name
+    \begin{tabular}{@{} ll ll @{}}
+        \toprule
+        \multicolumn{2}{c}{\textbf{Request}} & \multicolumn{2}{c}{\textbf{Reply}} \\
+        \cmidrule(r){1-2} \cmidrule(l){3-4} 
+        \textbf{Type} & \textbf{Name} & \textbf{Type} & \textbf{Name} \\
+        \midrule
+        
+        \code{261} & \code{query\_short\_channel\_ids} & \code{262} & \code{reply\_short\_channel\_ids\_end} \\
+        \code{263} & \code{request\_channel\_range}    & \code{264} & \code{reply\_channel\_range} \\
+        \code{265} & \code{gossip\_timestamp\_filter}  &           & --- \\
+        
+        \bottomrule
+    \end{tabular}
+
+    \caption{Gossip query and reply message types defined in BOLT 07. Note that \code{gossip\_timestamp\_filter} does not trigger a direct reply~\cite[section ~Query Messages]{lightningdevelopers_lightning_2018}.}
+    \label{tab:gossip-query-reply-bolt-07}
+    
+\end{table}
+
+\paragraph{Query Short Channel Ids \code{261}}
+~\cite[section ~query\_short\_channel\_ids]{lightningdevelopers_lightning_2018}
+\begin{figure}[htbp]
+    \centering
+    % 32-bit width (4 bytes per row)
+    \begin{bytefield}[
+        bitwidth=1.1em, endianness=big]{32}
+        \bitheader{0,15,16,31} \\
+        
+        % --- Type ---
+        \bitbox{16}{\code{type} (261)} & \bitbox{16}{} \\
+        
+        % --- Chain Hash (32 bytes) ---
+        \wordbox{1}{\code{chain\_hash} (32 bytes)} \\
+        
+        % --- Len (u16) + Padding for visual alignment ---
+        % 'len' is 2 bytes. We place it on the left.
+        \bitbox{16}{\code{len} (u16)} & \bitbox{16}{\textit{(reserved space)}} \\
+        
+        % --- Encoded Short IDs (Variable Length) ---
+        % The length is determined by 'len' above
+        \wordbox[lrt]{1}{\code{encoded\_short\_ids}} \\
+        \wordbox[lrb]{1}{(\code{len} bytes)} \\
+        
+        % --- TLVs (Variable Stream) ---
+        % Contains query_flags (type 1)
+        \wordbox[lrt]{1}{\code{tlvs}} \\
+        \wordbox[lrb]{1}{(variable length stream)} \\
+        
+    \end{bytefield}
+    \caption{Byte layout of the \code{query\_short\_channel\_ids} message. The \code{encoded\_short\_ids} field contains compressed \gls{scid}s, and the \code{tlvs} field may contain \code{query\_flags} to filter the response~\cite[section ~query\_short\_channel\_ids]{lightningdevelopers_lightning_2018}.}
+    \label{fig:query_short_channel_ids}
+\end{figure}
+
+
+\paragraph{Reply Short Channel Ids End \code{262}}
+
+\begin{figure}[htbp]
+    \centering
+    % 32-bit width (4 bytes per row)
+    \begin{bytefield}[
+        bitwidth=1.1em, endianness=big]{32}
+        \bitheader{0,15,16,31} \\
+        
+        % --- Type (2 bytes) ---
+        \bitbox{16}{\code{type} (262)} & \bitbox{16}{} \\
+        
+        % --- Chain Hash (32 bytes) ---
+        \wordbox{1}{\code{chain\_hash} (32 bytes)} \\
+        
+        % --- Full Information (1 byte) ---
+        % We explicitly show the 1 byte and leave 3 bytes empty for alignment.
+        \bitbox{8}{\code{full\_info}} & \bitbox{24}{} \\
+        
+    \end{bytefield}
+    \caption{Byte layout of the \code{reply\_short\_channel\_ids\_end} message. The \code{full\_information} byte (previously named \code{complete}) signals if the replying node believes it has provided all available data~\cite[section ~reply\_short\_channel\_ids\_end]{lightningdevelopers_lightning_2018}.}
+    \label{fig:reply_short_channel_ids_end}
+\end{figure}
+
+
+\paragraph{Request Channel Range \code{263}}
+\begin{figure}[htbp]
+    \centering
+    % 32-bit width (4 bytes per row)
+    \begin{bytefield}[
+        bitwidth=1.1em, endianness=big]{32}
+        \bitheader{0,15,16,31} \\
+        
+        % --- Type ---
+        \bitbox{16}{\code{type} (263)} & \bitbox{16}{} \\
+        
+        % --- Chain Hash ---
+        \wordbox{1}{\code{chain\_hash} (32 bytes)} \\
+        
+        % --- First Blocknum (u32) ---
+        \bitbox{32}{\code{first\_blocknum} (u32)} \\
+        
+        % --- Number of Blocks (u32) ---
+        \bitbox{32}{\code{number\_of\_blocks} (u32)} \\
+        
+        % --- TLVs (Variable) ---
+        % Contains query_option (type 1)
+        \wordbox[lrt]{1}{\code{tlvs}} \\
+        \wordbox[lrb]{1}{(variable stream)} \\
+        
+    \end{bytefield}
+    \caption{Byte layout of the \code{query\_channel\_range} message. The \code{tlvs} field may contain \code{query\_option} flags to request timestamps or checksums for the specified block range~\cite[section ~query\_channel\_range]{lightningdevelopers_lightning_2018}.}
+    \label{fig:query_channel_range}
+\end{figure}
+
+
+\paragraph{Reply Chanel Range \code{264}}
+
+\begin{figure}[htbp]
+    \centering
+    % 32-bit width (4 bytes per row)
+    \begin{bytefield}[
+        bitwidth=1.1em, endianness=big]{32}
+        \bitheader{0,15,16,31} \\
+        
+        % --- Type ---
+        \bitbox{16}{\code{type} (264)} & \bitbox{16}{} \\
+        
+        % --- Chain Hash ---
+        \wordbox{1}{\code{chain\_hash} (32 bytes)} \\
+        
+        % --- Block Ranges ---
+        \bitbox{32}{\code{first\_blocknum} (u32)} \\
+        \bitbox{32}{\code{number\_of\_blocks} (u32)} \\
+        
+        % --- Sync Complete (1 byte) & Len (2 bytes) ---
+        % Total 24 bits used. We leave 8 bits empty for visual alignment 
+        % before starting the large data blocks.
+        \bitbox{8}{\code{sync}} & 
+        \bitbox{16}{\code{len} (u16)} & 
+        \bitbox{8}{} \\
+        
+        % --- Encoded Short IDs ---
+        \wordbox[lrt]{1}{\code{encoded\_short\_ids}} \\
+        \wordbox[lrb]{1}{(\code{len} bytes)} \\
+        
+        % --- TLVs ---
+        % May contain timestamps (type 1) and checksums (type 3)
+        \wordbox[lrt]{1}{\code{tlvs}} \\
+        \wordbox[lrb]{1}{(timestamps / checksums)} \\
+        
+    \end{bytefield}
+    \caption{Byte layout of the \code{reply\_channel\_range} message. The \code{sync} (\code{sync\_complete}) byte indicates if this is the final reply in a sequence. The \code{tlvs} stream may contain \code{encoded\_timestamps} and \code{checksums} to facilitate efficient reconciliation~\cite[section ~reply\_channel\_range]{lightningdevelopers_lightning_2018}.}
+    \label{fig:reply_channel_range}
+\end{figure}
+
+
+\paragraph{Gossip Timestamp Filter \code{265}}
+\begin{figure}[htbp]
+    \centering
+    % 32-bit width (4 bytes per row)
+    \begin{bytefield}[
+        bitwidth=1.1em, endianness=big]{32}
+        \bitheader{0,15,16,31} \\
+        
+        % --- Type ---
+        \bitbox{16}{\code{type} (265)} & \bitbox{16}{} \\
+        
+        % --- Chain Hash ---
+        \wordbox{1}{\code{chain\_hash} (32 bytes)} \\
+        
+        % --- First Timestamp (u32) ---
+        \bitbox{32}{\code{first\_timestamp} (u32)} \\
+        
+        % --- Timestamp Range (u32) ---
+        \bitbox{32}{\code{timestamp\_range} (u32)} \\
+        
+    \end{bytefield}
+    \caption{Byte layout of the \code{gossip\_timestamp\_filter} message. This message constrains relayed gossip to a specific time window defined by \code{first\_timestamp} and the duration \code{timestamp\_range}~\cite[section ~gossip\_timestamp\_filter]{lightningdevelopers_lightning_2018}.}
+    \label{fig:gossip_timestamp_filter}
+\end{figure}
+
+\fi

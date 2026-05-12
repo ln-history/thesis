@@ -1,0 +1,110 @@
+\chapter{Introduction}
+\label{ch:introduction}
+
+The Bitcoin \gls{ln} is a \gls{pcn} built upon the Bitcoin network. 
+Since its inception in 2018, the network has experienced remarkable growth, making its evolution a subject 
+of significant interest for researchers, protocol engineers, and developers. 
+The \gls{ln} can be abstracted as a graph object. 
+As of the writing of this thesis, 
+the public network consists of more than \num{15000} active nodes and approximately \num{45000} payment channels acting as edges.
+
+Because the \gls{ln} operates as a distributed \gls{p2p} network, 
+information regarding its dynamic topology (e.g. the creation of new nodes or channels)
+cannot be centrally managed or requested. 
+Instead, the network relies on the Lightning Protocol (\gls{bolt}), which defines 
+three types of \term{gossip messages}: \code{channel\_announcement}, \code{node\_announcement} and \code{channel\_update}. 
+These messages are continuously broadcast between nodes and form the foundation for network discovery and routing.
+
+Capturing and analysing this distributed data is a technical challenge. 
+This thesis introduces \tech{ln-history}, a platform featuring a novel architecture designed 
+not only to collect and persist gossip messages (via real-time ingestion and bulk imports) 
+but also to enable deep empirical analysis.
+
+
+\section{Research Contributions}
+This thesis presents both the complete system design of \tech{ln-history} and 
+an empirical analysis demonstrating the platform's wide range of capabilities.
+\begin{itemize}
+    \item \textbf{High-Performance Architecture:} 
+        The platform features lightning-fast historical snapshot generation (averaging approximately \qty{3}{\second} per snapshot), 
+        a capability previously unavailable in the research ecosystem.
+    \item \textbf{Real-Time and Historical Analysis:} 
+        The platform is utilized to measure real-time metrics such as message volume and propagation lag, 
+        while also hosting one of the most complete historical gossip datasets available, 
+        making it ideal for tracking the long-term evolution of the \gls{ln}.
+    \item \textbf{Open-Source Verifiability:} 
+        Ensuring absolute transparency, the entire project, including its source code and infrastructure components, 
+        is completely open-source\footnote{\url{https://github.com/ln-history}} and publicly accessible 
+        via a website\footnote{\url{https://ln-history.info}}.
+\end{itemize}
+
+
+\section{Scope and Conventions}
+To ensure clarity and precision throughout this thesis, 
+the following technical scopes and typographical conventions are established:
+
+\paragraph{Nomenclature and Units}
+Following the convention introduced in~\citetitle[chapter ~1]{antonopoulos_mastering_2021} by~\citeauthor{antonopoulos_mastering_2021}, 
+the capitalized word \textit{Bitcoin} refers to the network and technology as a whole, 
+whereas the lowercase \textit{bitcoin} refers to the unit of currency (abbreviated as BTC)~\cite{antonopoulos_mastering_2021}. 
+One bitcoin is divisible into \num{100000000} \term{satoshis} (sat). 
+Because the \gls{ln} supports fractional routing fees, the primary unit of account 
+within the protocol is \term{milli-satoshi} (msat). 
+In this thesis, all three units (bitcoin, sat, msat) are utilized depending on the relevant scale of the values. 
+Additionally, data sizes are denoted using standard abbreviations, 
+distinguishing between \textit{bytes} (B) and \textit{bits} (b).
+
+\paragraph{Network Scope}
+While it is common to refer to \enquote{the} Lightning Network, the protocol does not enforce a single, unified topology. 
+The network can technically fracture into multiple isolated components. 
+Therefore, whenever this thesis refers to the \gls{ln} topology, 
+it actually describes the \textit{largest connected component} of the network. 
+Furthermore, the protocol allows for the creation of \textit{private} (unannounced) channels. 
+Because these channels are intentionally hidden from the public gossip protocol, 
+they are excluded from the empirical analysis presented in this work.
+\newpage
+
+
+\section*{Thesis Outline}
+
+The structure of the thesis is as follows:
+
+\begin{itemize}
+    \item \textbf{Related Work}  
+        \hyperref[ch:related-work]{Chapter~\ref*{ch:related-work}} summarizes the academic and developer landscape for Bitcoin and \gls{ln} \gls{p2p} network data analysis. 
+        It highlights the various research papers (particularly the \term{time-machine} methodology developed by \citeauthor{decker_lnresearch_2020}~\cite{decker_lnresearch_2020} 
+        and utilized by \citeauthor{zabka_empirical_2022}~\cite{zabka_empirical_2022}) that motivated the development of \tech{ln-history}.
+    
+    \item \textbf{Background} 
+        \hyperref[ch:background]{Chapter~\ref*{ch:background}} provides the theoretical foundation of the \gls{ln} protocol, known as \term{BOLT}. 
+        It focuses specifically on BOLT\#7, which defines the gossip protocol, 
+        while also providing the necessary introductory concepts regarding the Bitcoin system.
+    
+    \item \textbf{Architecture} 
+        \hyperref[ch:architecture]{Chapter~\ref*{ch:architecture}} details the complete design of the \tech{ln-history} platform. 
+        It outlines the architectural trade-offs, system requirements, and the database-centric approach
+        enabling in-depth analytical queries. 
+        The system's components are presented sequentially, matching the data flow: 
+        from real-time ingestion via the \service{gossip-publisher-zmq} \gls{cln} plugin, 
+        to the \service{gossip-processor}, and finally to the \service{ln-history-database},
+        and also details historical bulk imports,
+        the \term{RESTful} \service{ln-history-api}, 
+        a ready-to-use Python client (\service{ln-history-python-client}), 
+        and the platform's observability and deployment strategies.
+    
+    \item \textbf{Empirical Data Analysis} 
+        \hyperref[ch:empirical-data-analysis]{Chapter~\ref*{ch:empirical-data-analysis}} demonstrates the analytical capabilities of the platform through a two-part study. 
+        Firstly, it analyses real-time metadata collected over 48 days (January to March 2026) 
+        by two independent collector nodes, measuring propagation lag, message volume, topological overlap, and peer-session durations. 
+        Secondly, it performs a historical analysis utilizing remarkable \num{91.3} million gossip messages 
+        to construct monthly snapshots from 2018 to April 2026, evaluating channel lifetimes and network centrality metrics.
+    
+    \item \textbf{Conclusion} 
+        \hyperref[ch:conclusion]{Chapter~\ref*{ch:conclusion}} summarizes the empirical findings and discusses their broader implications 
+        for the network's efficiency and topology.
+    
+    \item \textbf{Future Work:} 
+        \hyperref[ch:future-work]{Chapter~\ref*{ch:future-work}} outlines how the platform's infrastructure can be leveraged to tackle future research questions. 
+        Furthermore, it highlights the latest protocol developments e.g. the Gossip v2 specification (which was just merged on May 4th 2026) 
+        and provides an outlook on emerging Layer-2 and Layer-3 scaling solutions within the broader Bitcoin ecosystem.
+\end{itemize}
