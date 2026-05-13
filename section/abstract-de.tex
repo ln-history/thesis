@@ -1,14 +1,25 @@
 \section*{Zusammenfassung}
 
-Die vorliegende Arbeit präsentiert \tech{ln-history}, eine neue Plattformarchitektur, 
-die die Erfassung, langfristige Speicherung und tiefgreifende Analyse sowohl historischer 
-als auch in Echtzeit erzeugten Gossip-Daten des Lightning Netzwerks, ermöglicht. 
-Um diese Anforderungen an der Plattform zu demonstrieren, führt diese Arbeit 
-eine empirische Analyse der Verbreitung von Gossip-Nachrichten sowie eine 
-Untersuchung der topologischen Entwicklung des Netzwerks durch.
+Die vorliegende Arbeit präsentiert \tech{ln-history}, eine Plattformarchitektur,
+die in Echtzeit Gossip-Daten des Lightning Netzwerks erfasst, langfristig speichert
+und komplexe Analysen über diesen ermöglicht.
+Bislang existiert kein vergleichbares System, denn
+bisherige Gossip-Daten-Analysen basieren auf einzelnen unzusammenhängenden Skripten.
+Mit \tech{ln-history} stellen wir ein Datenbank-zentriertes Design vor, in dem
+das Sammeln der Gossip-Daten über mehrere verteilte Knotenpunkte
+im Netzwerk hoch skaliert werden kann.
 
-Durch den Aufbau eines der bislang vollständigsten Datensätze von Gossip-Nachrichten des Lightning Netzwerks  
-etabliert diese Arbeit \tech{ln-history} als ein wertvolles quelloffenes Werkzeug für zukünftige Forschung. 
-Darüber hinaus präsentiert sie verschiedene empirische Erkenntnisse zum Netzwerkverhalten, 
-darunter Gossip-Überschneidungen (Overlap), Ausbreitungsverzögerung (Propagation Lag), 
-die Lebensdauer von Kanälen (Channel Lifetime) und Netzwerkzentralität.
+Um das Erreichen der hohen Plattform-Anforderungen zu demonstrieren, 
+führt diese Arbeit eine empirische Analyse über die Verbreitung von Gossip-Nachrichten, 
+sowie eine Untersuchung der topologischen Veränderung des Lightning Netzwerks durch.
+Dabei werden nicht nur die gesammelte Gossip-Daten selbst, sondern auch zusätzlich
+erstelle Metainformationen berücksichtigt.
+Während der Entwicklung wurde einer der bislang vollständigsten Datensätze 
+mit circa \num{91.3} Millionen Gossip-Nachrichten aufgebaut.
+
+Diese Arbeit zeigt, dass \tech{ln-history} ein leistungsstarkes, 
+quelloffenes Werkzeug für zukünftige Forschung ist. 
+Ebenso wird gezeigt, dass verschiedenste empirische Analysen zum Netzwerkverhalten 
+wie beispielsweise, Gossip-Überschneidungen (Overlap), Ausbreitungsverzögerung (Propagation Lag), 
+die Lebensdauer von Kanälen (Channel Lifetime) und Netzwerkzentralität durchgeführt
+werden können.

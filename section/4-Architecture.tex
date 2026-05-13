@@ -116,7 +116,7 @@ The design is further constrained by quality attributes essential for a research
 
 
 
-\section{The Big Picture: High-Level Architecture}
+\section{High-Level Architecture}
 \label{sec:high-level-architecture}
 
 \citeauthor{kleppmann_designing_2017} presents the \term{Lambda Architecture} in \citetitle{kleppmann_designing_2017}
@@ -293,7 +293,7 @@ On Startup the plugin initializes a \term{PUB socket} using the host and port de
 making asynchronous consumption by downstream consumers (e.g. \service{gossip-processor}) possible.
 
 
-\subsection{\service{Gossip Processor}}
+\subsection{\service{Gossip-Processor}}
 The \service{gossip-processor} is written in \tech{Python} and the source code can be found at ~\cite{kraus_gossipprocessor_2026}. 
 It acts as a \term{SUB node}, connecting to one or more \tech{ZeroMQ} \term{PUB sockets} to consume the plugin events.
 The plugin events get analysed and added into the \service{ln-history-database}.
@@ -374,7 +374,7 @@ This architectural upgrade reduced the transaction overhead and the frequency of
 yielding improvements in the overall throughput and enabling scaling.
 
 
-\section{The Batch Ingestion Pipeline}
+\section{Batch Ingestion Pipeline}
 \label{sec:batch-pipeline}
 The batch ingestion pipeline is done via a \tech{Python} script called \file{bulk-import.py} 
 and the source code found at\footnote{\url{https://ln-history.info/bulk-import.py}}.
@@ -782,7 +782,7 @@ skipping random disk seeks.
 
 \section{Data Enrichment}
 
-\subsection{Data Enrichment from the Blockchain \service{chain-enricher}}
+\subsection{Blockchain Data Enrichment: \service{chain-enricher}}
 \label{sec:chain-enricher}
 
 The operational footprint of the \gls{ln} on the Bitcoin blockchain is limited to two events: 
@@ -792,7 +792,7 @@ Because Lightning nodes rely on their underlying Bitcoin nodes to observe these 
 specific on-chain metrics such as channel capacity or closure details
 are omitted from the gossip protocol to reduce network bandwidth~\cite{antonopoulos_mastering_2021}.
 
-The motivation for the \service{chain-enricher} is to seperate the gathering of on-chain information from the \service{gossip-processor}. 
+The motivation for the \service{chain-enricher} is to separate the gathering of on-chain information from the \service{gossip-processor}. 
 The \service{chain-enricher} is written in python and its source code can be found here~\cite{kraus_chainenricher_2026}. 
 It operates via concurrent worker threads that asynchronously query indexed blockchain data, 
 enriching the \service{ln-history-database} with metadata without disturbing the real-time gossip ingestion.
@@ -816,7 +816,7 @@ To maximize throughput, these queries are executed concurrently across multiple 
 
 \paragraph{Fallback Retrieval (Bitcoin Core RPC)}
 If the primary retrieval fails, the service falls back to a secondary method that leverages the structural properties of the \gls{scid}. 
-As elaborated in \autoref{sec:gossip-messages}, the $64$-bit \gls{scid} deterministically encodes the block height, transaction index, and output index. 
+As elaborated in \autoref{sec:gossip-messages}, the \qty{64}{\bit} \gls{scid} deterministically encodes the block height, transaction index, and output index. 
 The worker decodes this identifier and issues a sequence of batched JSON-RPC queries (\code{getblockhash}, \code{getblock}, and \code{getrawtransaction}) 
 directly to a local Bitcoin Core node to locate the exact funding output.
 
@@ -984,10 +984,10 @@ the client provides the \code{LnHistoryRequester} class.
         Method definition for retrieving historic network snapshots. 
         The method supports direct deserialization into graph structures for immediate topological analysis~\cite[./LnHistoryRequester.py]{kraus_lnhistorypythonclient_2026}.
     }
-    \label{lst:get_snapshot_at_timestamp_header}
+    \label{lst:get-snapshot-at-timestamp-header}
 \end{listing}
 
-As shown in \autoref{lst:get_snapshot_at_timestamp_header}, the \code{get\_snapshot\_at\_timestamp} method 
+As shown in \autoref{lst:get-snapshot-at-timestamp-header}, the \code{get\_snapshot\_at\_timestamp} method 
 allows researchers to retrieve a full network snapshot from the \service{ln-history-api}.
 This method natively parses the incoming binary stream and directly deserializes it into a 
 \tech{NetworkX}~\cite{hagberg_exploring_2008} directed graph (\code{nx.DiGraph}), 
@@ -998,7 +998,7 @@ The library is packaged and distributed via the Python Package Index (\gls{pypi}
 allowing for modular installation in other components of the system via \code{pip install lnhistoryclient}.
 
 
-\section{Observability: Monitoring, Logging, Tracing}
+\section{Observability}
 \label{sec:observability}
 
 The \tech{ln-history} platform is designed to constantly process high volumes of network data. 

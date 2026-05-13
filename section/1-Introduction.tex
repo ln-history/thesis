@@ -5,14 +5,14 @@ The Bitcoin \gls{ln} is a \gls{pcn} built upon the Bitcoin network.
 Since its inception in 2018, the network has experienced remarkable growth, making its evolution a subject 
 of significant interest for researchers, protocol engineers, and developers. 
 The \gls{ln} can be abstracted as a graph object. 
-As of the writing of this thesis, 
-the public network consists of more than \num{15000} active nodes and approximately \num{45000} payment channels acting as edges.
+In April 2026 the public network consists of more than
+\num{15000} active nodes and approximately \num{45000} payment channels acting as edges.
 
 Because the \gls{ln} operates as a distributed \gls{p2p} network, 
 information regarding its dynamic topology (e.g. the creation of new nodes or channels)
 cannot be centrally managed or requested. 
 Instead, the network relies on the Lightning Protocol (\gls{bolt}), which defines 
-three types of \term{gossip messages}: \code{channel\_announcement}, \code{node\_announcement} and \code{channel\_update}. 
+the communication, mainly three types of \term{gossip messages}: \code{channel\_announcement}, \code{node\_announcement} and \code{channel\_update}. 
 These messages are continuously broadcast between nodes and form the foundation for network discovery and routing.
 
 Capturing and analysing this distributed data is a technical challenge. 
@@ -34,8 +34,7 @@ an empirical analysis demonstrating the platform's wide range of capabilities.
         making it ideal for tracking the long-term evolution of the \gls{ln}.
     \item \textbf{Open-Source Verifiability:} 
         Ensuring absolute transparency, the entire project, including its source code and infrastructure components, 
-        is completely open-source\footnote{\url{https://github.com/ln-history}} and publicly accessible 
-        via a website\footnote{\url{https://ln-history.info}}.
+        is completely open-source\footnote{\url{https://github.com/ln-history}}.
 \end{itemize}
 
 
@@ -55,11 +54,12 @@ Additionally, data sizes are denoted using standard abbreviations,
 distinguishing between \textit{bytes} (B) and \textit{bits} (b).
 
 \paragraph{Network Scope}
-While it is common to refer to \enquote{the} Lightning Network, the protocol does not enforce a single, unified topology. 
-The network can technically fracture into multiple isolated components. 
+While it is common to refer to \enquote{the} Lightning Network, 
+the protocol does not enforce a single, unified topology. 
+The network can technically split up into multiple isolated components. 
 Therefore, whenever this thesis refers to the \gls{ln} topology, 
 it actually describes the \textit{largest connected component} of the network. 
-Furthermore, the protocol allows for the creation of \textit{private} (unannounced) channels. 
+Additionally, the protocol allows for the creation of \textit{private} (unannounced) channels. 
 Because these channels are intentionally hidden from the public gossip protocol, 
 they are excluded from the empirical analysis presented in this work.
 \newpage
@@ -94,7 +94,7 @@ The structure of the thesis is as follows:
     
     \item \textbf{Empirical Data Analysis} 
         \hyperref[ch:empirical-data-analysis]{Chapter~\ref*{ch:empirical-data-analysis}} demonstrates the analytical capabilities of the platform through a two-part study. 
-        Firstly, it analyses real-time metadata collected over 48 days (January to March 2026) 
+        Firstly, it analyses real-time metadata collected over 48 days (January 14th to March 3rd 2026) 
         by two independent collector nodes, measuring propagation lag, message volume, topological overlap, and peer-session durations. 
         Secondly, it performs a historical analysis utilizing remarkable \num{91.3} million gossip messages 
         to construct monthly snapshots from 2018 to April 2026, evaluating channel lifetimes and network centrality metrics.

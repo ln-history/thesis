@@ -66,15 +66,12 @@ the geographic distribution of nodes by country, propagation delays and much mor
 % Independent researchers
 Due to Bitcoins free and open source ethos a variety of independent researchers work actively on Bitcoin. 
 A subset of those focus on the \gls{p2p} network traffic.
-
 The researcher \citeauthor{0xb10c_map_2026} maintains the project \citetitle{0xb10c_map_2026} showing 
-various projects (including \tech{ln-history}) that focus on \gls{p2p} network monitoring.
-
+various projects (including \tech{ln-history}) that focus on \gls{p2p} network monitoring~\cite{0xb10c_map_2026}.
 Early Bitcoin Core contributor \citeauthor{corallo_21ninja}, shows his research, 
-which focuses on DNS seed metrics and reachable nodes, on this website\footnote{\url{https://21.ninja}}~\cite{corallo_21ninja}.
+which focuses on DNS seed metrics and reachable nodes, on this website\footnote{\url{https://21.ninja}}.
 Additionally, researcher \citeauthor{lopp_satoshi_info} maintains the \term{statoshi} project\footnote{\url{https://statoshi.info}}, 
-providing extensive network visualizations~\cite{lopp_satoshi_info}
-
+providing extensive network visualizations.
 To minimize propagation latency and reduce the risk of stale block races, miners can use 
 high-speed overlay networks outside the traditional Bitcoin \gls{p2p} topology, 
 such as the \gls{fibre}~\cite{corallo_fibre}.
@@ -111,14 +108,11 @@ Notably, \citeauthor{decker_lnresearch_2020} and Prof. Schmid
 published foundational studies~\cite{zabka_empirical_2022, zabka_short_2022}, 
 releasing a dataset of over \num{35} million gossip messages spanning 
 from the network's inception in 2018 to 2023~\cite{decker_lnresearch_2020}. 
-
 This dataset served as the empirical basis for subsequent topological research, 
 including quantitative analyses by \citeauthor{atmanaviciute_quantitative_2025}~\cite{atmanaviciute_quantitative_2025} 
-and geo-location studies by \citeauthor{valko_geolocated_2025}~\cite{valko_geolocated_2025}. 
-
+and geolocation studies by \citeauthor{valko_geolocated_2025}~\cite{valko_geolocated_2025}. 
 Unfortunately, this foundational dataset contains significant temporal gaps, 
 and active collection by \citeauthor{decker_lnresearch_2020} has stopped. 
-
 This lack of continuous and reliable data is the primary motivation 
 for \tech{ln-history}: to establish an independent, open-source infrastructure dedicated 
 to the persistent collection of \gls{ln} gossip. 
