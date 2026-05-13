@@ -4,9 +4,7 @@
 This chapter showcases the analytical possibilities of the \tech{ln-history} platform. 
 By using the \service{ln-history-database} and \service{ln-history-api}, 
 we conduct novel analyses of the \gls{ln} and update existing findings from previous literature. 
-
 All analytical scripts and raw data underlying this chapter are available as open-source code\footnote{\url{https://ln-history.info/analysis}}.
-
 The analysis is divided into two scopes:
 
 \begin{itemize}
@@ -22,15 +20,13 @@ The analysis is divided into two scopes:
 The first section (\autoref{sec:metadata-analysis}) is limited to the continuous collection window 
 maintained by the two \tech{ln-history} collector nodes. 
 This window starts on January 14, 2026, to March 3, 2026, during which the platform operated without major outages. 
-Both nodes were deployed using the default \gls{cln} (\code{v25.09})configuration, 
+Both nodes were deployed using the default \gls{cln} (\code{v25.09}) configuration, 
 meaning they actively maintained connections to ten peers to receive gossip messages. 
 
 By utilizing the metadata enriched during this period, we examine the total volume of messages 
 and the degree of data overlap between the two distinct points in the topology (\autoref{fig:network-gossip-volume-and-overlap}). 
-
 After that, we calculate the absolute propagation lag of the \gls{ln} (\autoref{fig:propagation-lag}) 
-and the \textit{inter-collection lag} between our two collector nodes (\autoref{fig:inter-collection-lag}). 
-
+and the inter-collection lag between our two collector nodes (\autoref{fig:inter-collection-lag}). 
 Finally, we analyse node connectivity behaviour by showing the distribution of peer session lengths (\autoref{fig:peer-session-distribution}) 
 and testing for correlations between session duration and overall node capacity (\autoref{fig:peer-session-correlation}).
 
@@ -38,16 +34,13 @@ and testing for correlations between session duration and overall node capacity 
 The second section (\autoref{sec:historic-gossip-analysis}) utilizes the batch-import 
 capabilities of the platform to dive into the historical evolution of the \gls{ln} topology. 
 We establish a baseline by showing the overall volume and distribution of historic gossip messages (\autoref{fig:gossip-messages-distribution}). 
-
-
 Using the platform's snapshot functionality, we focus on payment channels, 
 which build the routing backbone of the \gls{ln}. 
 By examining the channel lifetime distribution (\autoref{fig:channel-lifetime-distribution}), 
 we gain insights into the capital efficiency of the network. 
 We also investigate whether the capacity of a channel influences correlates 
 with the lifetime of a channel lifetime (\autoref{fig:channel-lifetime-correlation}). 
-
-Finally, acknowledging that the \gls{ln} is a distributed and not strictly decentralized network, 
+We finish off by acknowledging that the \gls{ln} is a distributed and not strictly decentralized network, 
 we analyse its structural centralization over time. 
 Building upon the methodology introduced by \citeauthor{zabka_short_2022}~\cite{zabka_short_2022}, 
 we calculate the Gini coefficient based on the \gls{bc} for each historical snapshot (\autoref{fig:betweenness-centrality-gini}) 
@@ -63,8 +56,7 @@ We introduced the gossip protocol in \autoref{sec:ln-gossip-protocol}, showing
 how storage efficient the topology information is. 
 %AVG length of the raw_bytes column * number of messages in time frame * 0.8
 We begin by exploring the collected gossip messages, shedding light into the volume
-as well as how good it actually spreads.
-
+as well as completeness.
 First we quantify the daily message volume and empirically measure the message propagation across the network. 
 Theoretically, the \gls{ln} gossip protocol aims for global \textit{consensus}, 
 meaning every node should eventually receive every broadcasted message.
@@ -72,19 +64,20 @@ meaning every node should eventually receive every broadcasted message.
 
 \subsection{Network Gossip Volume and Lag}
 
-We first begin by showing the number of gossip messages in the time frame to estimate the baseline network volume. 
-To assess propagation consistency, we evaluate the intersection of messages received by our two independent collector nodes (\textit{Alice} and \textit{Bob}).
+We start by showing the number of gossip messages in the time frame to estimate the baseline network volume. 
+To assess propagation consistency, we evaluate the intersection of messages received 
+by our two independent collector nodes (referred to as \textit{Alice} and \textit{Bob}).
 
 \subsubsection{Network Gossip Volume and Overlap}
 
-Both collector nodes (\textit{Alice} and \textit{Bob}) operate independently and 
+Both collector nodes operate independently and 
 append a local \code{seen\_at} timestamp as soon as they receive a gossip message. 
 This gives three scenarios: 
 A gossip message may be observed exclusively by Alice, exclusively by Bob, or (successfully) by both nodes.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\linewidth]{resources/results-final/network-gossip-volume-and-overlap.pdf}
+    \includegraphics[width=0.7\linewidth]{resources/results-final/network-gossip-volume-and-overlap.pdf}
     \caption {
         In the measured time window around $400000$ unique messages have been seen by both nodes.
         The overall share of messages that have been received by both nodes is around $80\%$.
@@ -239,7 +232,7 @@ to share their gossip to them, since they do not need it as they cannot route pa
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\textwidth]{resources/results-final/peer-session-distribution.pdf}
+    \includegraphics[width=0.7\textwidth]{resources/results-final/peer-session-distribution.pdf}
     \caption{
         Distribution of peer sessions with the collector nodes (\textit{Alice} and \textit{Bob}) 
         show that they have roughly the same number of connections ($423$ and $439$) in the time frame.
@@ -260,11 +253,11 @@ actively selecting reliable peers for gossip propagation is advantageous.
 A sustained, uninterrupted \gls{p2p} connection implicitly indicates that the peer possesses 
 a stable internet connection and robust underlying hardware. 
 
-Therefore we use the session duration as a proxy metric for the infrastructure reliability of the peer node.
+Therefore, we use the session duration as a proxy metric for the infrastructure reliability of the peer node.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\textwidth]{resources/results-final/corelation-node-size-and-session-duration.pdf}
+    \includegraphics[width=0.7\textwidth]{resources/results-final/corelation-node-size-and-session-duration.pdf}
     \caption{
         A trend exists that larger nodes tend to support longer sessions with a 
         correlation coefficient $r = 0.435$ (statistical significance $p < 0.001$).
@@ -282,7 +275,7 @@ on professional (high-availability) infrastructure, leading to fewer connection 
 
 For node operators, this finding offers a strategy to mitigate the gossip synchronization blind spots
 which were shown in \autoref{fig:network-gossip-volume-and-overlap}.
-
+\\
 
 
 \section{Historic Gossip Analysis}
@@ -303,19 +296,16 @@ which is the confirmation time of the underlying funding transaction.
 Aggregating these timestamps allows us to visualize the monthly volume of the entire dataset.
 
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.8\textwidth]{resources/results-final/gossip-distribution-by-type.pdf}
-\caption{
-    Monthly distribution of collected gossip messages by type. 
-    The timeline highlights two distinct periods of intensive data archiving: 
-    the initial 2019-2021 dataset provided by \citeauthor{decker_lnresearch_2020}~\cite{decker_lnresearch_2020}, 
-    and the ongoing \tech{ln-history} collection beginning in mid-2025. 
-    Notably, during the intermediate collection gap, primarily only \code{channel\_announcements} were consistently preserved. 
-    Under active monitoring conditions, \code{channel\_updates} dominate the network broadcast volume, 
-    whereas structural \code{channel\_announcements} remain the least frequent.
-}
-\label{fig:gossip-messages-distribution}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\textwidth]{resources/results-final/gossip-distribution-by-type.pdf}
+    \caption{
+        Monthly distribution of collected gossip messages by type. 
+        The timeline highlights two distinct periods of intensive data archiving: 
+        The initial 2019-2021 dataset provided by \citeauthor{decker_lnresearch_2020}~\cite{decker_lnresearch_2020}, 
+        and the ongoing \tech{ln-history} collection beginning in mid-2025. 
+    }
+    \label{fig:gossip-messages-distribution}
 \end{figure}
 
 \autoref{fig:gossip-messages-distribution} provides insight into both the composition of the gossip messages and the share of the preserved data. 
@@ -353,7 +343,7 @@ By measuring the time difference between these two block timestamps, we can calc
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\textwidth]{resources/results-final/channel-lifetime-distribution.pdf}
+    \includegraphics[width=0.7\textwidth]{resources/results-final/channel-lifetime-distribution.pdf}
     \caption{
         The median channel lifetime distribution of closed channels is \qty{105.6}{\day} days with a large variance.
         Some channels only exist for a few days whereas others survived multiple years. 
@@ -392,7 +382,7 @@ lifespans than smaller, potentially hobbyist-run channels.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.8\textwidth]{resources/results-final/channel-capacity-lifetime-correlation.pdf}
+    \includegraphics[width=0.7\textwidth]{resources/results-final/channel-capacity-lifetime-correlation.pdf}
     \caption{
         Scatter plot evaluating the relationship between a channel's capacity and its operational lifetime. 
         The data indicates no statistically significant correlation between the two variables.
@@ -522,14 +512,12 @@ We discuss the consequences of this in \autoref{ch:conclusion}.
 Future ideas:
 
 \item 4B Tor vs clearnet share of nodes per snapshot for every quarter of existing gossip
-    
-    
 
-    SUB Gossip analysis: which nodes send which gossip (redundant or actualy new information)
-    \item 1D Bigger nodes update more frequently, correlation?
-    \item 1E Bigger channels update more frequently?
-    \item 1F Looking at a channel: Does the bigger or smaller node update the fees more often?
-    
-    \item 1G Distribution how many channel_update messages are actually new and which are redundant
-    \item 1H Divide the network into active and passive nodes based on channel_update msg
+SUB Gossip analysis: which nodes send which gossip (redundant or actualy new information)
+\item 1D Bigger nodes update more frequently, correlation?
+\item 1E Bigger channels update more frequently?
+\item 1F Looking at a channel: Does the bigger or smaller node update the fees more often?
+
+\item 1G Distribution how many channel_update messages are actually new and which are redundant
+\item 1H Divide the network into active and passive nodes based on channel_update msg
 \fi

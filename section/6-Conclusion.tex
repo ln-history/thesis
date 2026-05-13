@@ -51,11 +51,10 @@ ensuring the reliability required for the empirical analysis in this thesis.
 As \autoref{sec:metadata-analysis} shows, Lightning nodes do not inherently have a 
 correctly synchronized or complete view of the network topology. 
 Beyond that, the protocol has disparities in propagation latency depending on the message type. 
-Compounding these synchronization inefficiencies is the suboptimal utilization of node bandwidth. 
 During data cleaning, more than half of the collected \code{node\_announcements} 
 were broadcasted redundantly without containing any novel topological information. 
 Given the propagation blind spots, the inherent latency variations, and the overhead of redundant metadata, 
-it is evident that researching and implementing optimizations to the gossip protocol is necessary for long-term scalability. 
+the empirical analysis shows that researching and implementing optimizations to the gossip protocol is necessary for long-term scalability. 
 Various approaches to address these architectural bottlenecks will be discussed in the upcoming \autoref{ch:future-work}.
 
 
@@ -64,13 +63,13 @@ Various approaches to address these architectural bottlenecks will be discussed 
 This thesis contributes empirical observations regarding the peer management behaviour of default \gls{cln} nodes. 
 While the \gls{ln} operates without an enforcement to forward gossip messages, 
 active participation in the gossip protocol fundamentally relies on stable \gls{p2p} connections. 
-The analysis demonstrated that peer session durations exhibit immense variance, ranging from minutes to weeks. 
+The analysis demonstrated that peer session durations have an immense variance, ranging from minutes to multiple days. 
 When coupled with the synchronization inaccuracies discussed previously, 
 the connection instability can yield to missing gossip messages.
 
 Nodes that offer routing services are economically incentivized to maintain highly reliable peer connections,
 a dynamic empirically supported by our finding that total node capacity positively correlates with the session duration. 
-By ensuring uninterrupted access to real-time topological updates and fee policies, 
+By ensuring uninterrupted access to gossip messages, specifically \code{channel\_updates},
 these enterprise-level hubs can minimize payment routing failures and optimize their overall service reliability.
 Smaller nodes that have an unstable connection are more prone to payment failures. 
 By missing critical \code{channel\_updates} during periods of downtime, 
@@ -81,13 +80,13 @@ these nodes risk to use outdated fee policies and inaccurate topological data du
 \section{Lightning Network Evolution}
 \label{sec:ln-evolution}
 
-The evolution of the \gls{ln} is a complex topic and can be analysed from different of angles.
-As we will see, the network has matured in the past eight years.
-Nonetheless, there still many open questions and possible improvements to be made.
+The evolution of the \gls{ln} is a complex topic and can be viewed from different angles.
+As we will see, the network has grown and matured in the past eight years.
+Nonetheless, there are still many open questions and possible improvements to be made.
 
 Following the structure of the \autoref{sec:historic-gossip-analysis}, 
 we first discuss the quality of the gossip dataset currently persisted in the \tech{ln-history} platform.
-After that we will, examine empirical measurements of channels.
+After that we will examine empirical measurements of all observed closed channels.
 Lastly, we will dive into discussions about the centrality of the \gls{ln}.
 
 
@@ -97,33 +96,30 @@ As mentioned in \autoref{sec:historic-gossip-analysis}, evaluating the complete
 repository of over \num{91.3} million historical gossip messages 
 reveals two distinct phases of intensive data collection, 
 separated by a multi-year observational blind spot between 2022 and mid-2025. 
-
 Despite this gap in ephemeral \code{channel\_updates}, 
 the structural integrity of the historical network graph can be approximated reconstructed 
 because the foundational \code{channel\_announcements} were largely preserved. 
-
 Furthermore, the \autoref{fig:gossip-messages-distribution} shows a hierarchy in network traffic composition. 
 Dynamic \code{channel\_updates} dominate the broadcast volume, followed by informational \code{node\_announcements}, 
-while structural \code{channel\_announcements} represent only a marginal fraction of the gossip protocol.
-
+while structural \code{channel\_announcements} represent only a tiny fraction of the gossip protocol.
 
 
 \subsection{Channels}
 
 Payment channels form the core of the \gls{ln} protocol. 
-In this section, we discuss the empirical findings of over \num{283226} channels.
+In this section, we discuss the empirical findings of over \num{283226} closed channels.
 The theoretical objective of a payment channel is to remain open indefinitely, 
 allowing nodes to route an unlimited number of off-chain transactions while 
 amortizing the initial on-chain setup fees. 
 However, as \autoref{fig:channel-lifetime-distribution} illustrates, 
-the empirical reality is different: of all channels that have ever been funded, more than \qty{75}{\percent}
+the empirical reality is different: of all channels that have ever been funded, 
+more than \qty{75}{\percent} have been closed.
 
 It is reasonable to assume that larger channels might have a longer lifespan than smaller ones. 
-Node operators committing significant financial capital to open large channels 
+Node operators committing significant capital to open large channels 
 likely plan their network topology more carefully. 
 To test this hypothesis, we measured the correlation between channel capacity (\code{capacity\_sat}) 
 and channel lifetime (\autoref{fig:channel-lifetime-correlation}).
-
 Surprisingly, the data reveals no correlation between these two variables. 
 A channel's financial size does not predict how long it will remain open.
 
@@ -134,10 +130,8 @@ Instead, they are often chosen based on human intuition or simple convenience.
 
 Ultimately, channel management proves to be far more complex than 
 simply opening a connection and leaving it alone. 
-The closure rate of over \qty{80}{\percent}, considering the networks whole history, can arguably be considered high.
-Combined with the lack of correlation to capacity—indicates that channels frequently require active adjustments, closures, and rebalancing. 
+The lack of correlation to capacity shows that channels frequently require active adjustments, closures, and rebalancing. 
 This reality affects all participants, regardless of whether they are a professional hub or an individual hobbyist.
-
 
 
 \subsection{Centrality}
@@ -150,27 +144,23 @@ The empirical data presented in \autoref{sec:centrality} aligns with this litera
 confirming that the network is highly centralized according to \gls{bc}.
 
 This thesis argues that the academic narrative is often one-sided. 
-
 Applying centrality metrics to static snapshots to condemn the network for deviating from Bitcoin's decentralized ethos,
 fails to critically evaluate the resulting operational value that dominant nodes provide.
-
 From an economic and operational perspective, a centralized topology is a logical and arguably beneficial development. 
-Professional routing hubs provide vital liquidity and continuous uptime necessary for a functional payment network. 
+Professional routing hubs provide liquidity and continuous uptime necessary for a functional payment network. 
 The presence of these dedicated backbone nodes is likely a driver behind the 
 high payment success rates and overall service reliability that the \gls{ln} currently provides~\cite{random__reran_2024}.
-
-Enforcing strict, uniform decentralization would likely fragment liquidity and increase routing failures.
+Enforcing strict, uniform decentralization would likely increase routing failures.
 
 Nonetheless, from the perspectives of privacy, censorship resistance, and systemic independence, 
-this centralization of routing power remains highly concerning. 
-Relying on a handful of dominant hub operators directly contradicts the foundational, 
-\gls{p2p} ethos of the Bitcoin ecosystem. 
-These central hubs represent a massive vulnerability regarding user privacy. 
+this centralization of routing power definitely remains concerning. 
+Relying on a handful of dominant hub operators contradicts the \gls{p2p} ethos of Bitcoin. 
+These central hubs represent a significant vulnerability regarding user privacy. 
 While Lightning payments utilize onion routing, central hubs process such a massive share of the total traffic 
 that they are uniquely positioned to perform traffic analysis. 
 By monitoring the flow, timing, and channel balances of adjacent packets, 
-dominant routing nodes could theoretically trace and deanonymize payment flows, 
-severely degrading the privacy guarantees originally engineered into the protocol~\cite{pickhardt_security_2021}.
+dominant routing nodes could theoretically try to trace and deanonymize payment flows, 
+severely degrading the privacy guarantees originally engineered into the protocol.
 
 Ultimately, the centrality of the \gls{ln} represents compromise that distributed systems have to face by design. 
 The network has organically gravitated toward a topology that sacrifices a degree of ideological decentralization and 

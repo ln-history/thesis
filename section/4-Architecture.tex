@@ -4,17 +4,17 @@
 This chapter presents the architectural design and implementation of the \tech{ln-history} platform. 
 Building upon the fundamental concepts of the \gls{ln} and its gossip protocol, 
 we first define the system requirements in \autoref{sec:requirements} 
-followed by an architectural overview in \autoref{sec:high-level-architecture}.
+followed by a high-level architectural overview in \autoref{sec:high-level-architecture}.
 After that the structure of this chapter mirrors the data flow within the system.
 We begin by analysing each component sequentially, 
 from different ingestion pipelines presented in \autoref{sec:real-time-pipeline} for
-real-time analysis and \autoref{sec:batch-pipeline} for bulk insertion. 
-To the storage layer in \autoref{sec:database} and its two auxiliary services:
+real-time analysis and \autoref{sec:batch-pipeline} for bulk insertion, t
+o the storage layer in \autoref{sec:database} and its two auxiliary services:
 Metadata enrichment in \autoref{sec:chain-enricher} and node behaviour monitoring \autoref{sec:peer-manager}.
 After that the backend \service{ln-history-api} is explained in \autoref{sec:ln-history-api}.
 To work with the results, we introduce a custom client library in \autoref{sec:ln-history-python-client}
-The chapter comes to an end by first discusses continuous monitoring of the system in \autoref{sec:observability}.
-Ultimately, the \autoref{sec:deployment} focuses on deployment.
+The chapter comes to an end by first discussing continuous monitoring of the system in \autoref{sec:observability}.
+Lastly, the \autoref{sec:deployment} focuses on deployment.
 As architecture decisions are often based on \textit{trade-offs} some sections
 conclude with a discussion about their particular design decisions. 
 
@@ -29,12 +29,11 @@ These datasets lack a unified structure, varying in their serialization formats
 
 The current benchmarking tool for parsing these messages is the \term{time-machine},
 developed by \citeauthor{decker_lnresearch_2020}~\cite{decker_lnresearch_2020}.
-The \term{time-machine} tool iterates through a file of gossip messages encoded in hex and yields a \tech{networkx} graph~\cite{hagberg_exploring_2008}.
-This, simple yet, effective procedure takes around 10 minutes on commodity hardware (e.g., Apple M1, 16 GB RAM) 
+The \term{time-machine} tool iterates through a file of gossip messages and yields a \tech{networkx} graph~\cite{hagberg_exploring_2008}.
+This, simple yet effective procedure takes approximately 10 minutes on commodity hardware (e.g., Apple M1, 16 GB RAM) 
 to process ten million gossip messages and yields a single graph for a single timestamp.
-Creating $n$ snapshots requires $n$ iterations of the \term{time-machine} tool
-through every collected gossip message resulting in redundant computation.  
-
+This means, that the creation of $n$ snapshots requires $n$ iterations of the \term{time-machine} tool
+resulting in redundant computation.  
 Further, gossip data analysis (e.g. gossip propagation lag) also needs a whole iteration through the file of gossip messages
 due to the fact that no index or meta information exists for a single gossip message.
 
@@ -42,7 +41,6 @@ To address these limitations, the \term{ln-history} platform is designed to
 transition from linear file processing to a database-centric architecture,
 indexing gossip messages and reducing the workload for various analytical queries
 e.g. snapshot generation from $\mathcal{O}(n)$ to $\mathcal{O}(\log n)$ or even $\mathcal(1)$. 
-
 The system must fulfil the following functional and non-functional requirements, 
 categorized by their operational scope.
 
@@ -67,25 +65,26 @@ Each requirement has a label which will be referenced when being taken into acco
         that make up the valid network state at any given timestamp.
     \item \label{req:snapshot-diff} \textbf{Time-Window Retrieval:} 
         The system must support range queries to retrieve all messages 
-        broadcast between two given timestamps $t_{start}$ and $t_{end}$.
+        broadcasted between two given timestamps $t_{start}$ and $t_{end}$.
     \item \label{req:entity-filtering} \textbf{Entity Filtering:} 
-        The system must be able to filter gossip history by specific identifiers, specifically \code{node\_id} and \code{scid}.
+        The system must be able to filter the gossip history by identifiers, 
+        specifically \code{node\_id} and \code{scid}.
 \end{enumerate}
 
 \subsubsection{Real-Time Operations}
 \begin{enumerate}[label=\textbf{RF\arabic*}, ref=RF\arabic*, resume, leftmargin=3.5em]
     \item \label{req:ingestion} \textbf{Low-Latency Ingestion:} 
-        Newly received gossip from the \gls{p2p} network must be inserted into the storage engine 
+        Newly received gossip from the \gls{p2p} network must be inserted 
         immediately to ensure the database reflects the live state.
     \item \label{req:concurrency} \textbf{Concurrency:} 
         The system must support simultaneous operations; historic analysis queries (\gls{olap}) 
         must not block or significantly degrade the performance of real-time write operations (\gls{oltp}).
     \item \label{req:multiple-nodes} \textbf{Multiple nodes:} 
-        The system must be scalable to multiple collecting nodes that feed 
+        The system must be scalable to multiple collector nodes that insert 
         new gossip messages in parallel into the platform.
     \item \label{req:metadata}\textbf{Metadata:} 
         In addition to the gossip message itself, metadata (e.g. the collection timestamp) 
-        must be linked to and stored.
+        must be linked to the gossip message and must also be stored.
     \item \label{req:batch-ingestion} \textbf{Batch Ingestion:} 
         The system must be able to insert historic messages in large batches.
 \end{enumerate}
@@ -103,12 +102,11 @@ The design is further constrained by quality attributes essential for a research
     
     \item \label{req:docker} \textbf{Deployability (Containerization):} 
     To facilitate easy adoption and reproducibility, the system must be fully containerized using Docker~\cite{merkel_docker_2014}. 
-    This ensures the platform is environment-agnostic, allowing it to run consistently on a developer's laptop, a university server, 
-    or a cloud cluster with the potential for future orchestration via Kubernetes ~\cite{burns_borg_2016}.
+    This ensures the platform is environment-agnostic, allowing it to run consistently on different machines.
     
     \item \label{req:self-host} \textbf{Efficiency (Self-Hostability):} 
     The architecture must be resource-efficient enough to run on consumer-grade hardware. 
-    By lowering the barrier to entry for hosting everyone should have the opportunity to run \tech{ln-history}.
+    By lowering the barrier to entry to host \tech{ln-history}.
 
     \item \label{req:maintainability} \textbf{Maintainability:}
     The system and the underlying code must be structured to support the ongoing development. 
@@ -133,7 +131,7 @@ The architecture of \tech{ln-history} implements a variation of this pattern.
 Real-time gossip messages from \gls{cln} nodes are ingested immediately while the system
 simultaneously supports bulk insertion of historic gossip messages.
 
-As the batch insertion of historic gossip messages rarely occurs, 
+As batch insertions of historic gossip messages rarely occur, 
 this process is done via a \term{backfill} script manually.
 On the other hand the real-time ingestion pipeline is managed by a service called \service{gossip-processor}.
 
@@ -178,10 +176,9 @@ to reach the required maturity before fully enriching the database\footnote{
     at least six confirmations before broadcasting a \code{channel\_announcement}~\cite{lightningdevelopers_bolts_2018}.
 }.
 
-Lastely the \service{ln-history-api} queries the \tech{ln-history-database} 
+Lastly, the \service{ln-history-api} queries the \tech{ln-history-database} 
 and provides a \term{restful} API for in-depth analysis as well as secure authentication\footnote{
 The \textit{SwaggerUI} shows the endpoints \url{https://api.ln-history.info/swagger/index.html}}.
-
 On the right-hand side clients (users) request the \service{ln-history-api}. 
 The \service{ln-history-python-client} provides the functionality to easily parse the response into readable formats.
 To minimize bandwidth, large results like a snapshot, are sent in raw bytes following the format of \gls{ln} gossip messages.
@@ -195,9 +192,8 @@ Additional functions to work with the \service{ln-history-api} are provided.
 
 As described by \citeauthor{hohpe_enterprise_2012} in \citetitle{hohpe_enterprise_2012} 
 the \term{Pipes and Filters} architectural style should be used to
-\enquote{divide a larger processing task into a sequence of smaller independent processing steps (filters)
- that are connected by channels (pipes)}~\cite[p.~70]{hohpe_enterprise_2012}.
-
+\enquote{divide a larger processing task into a sequence of smaller independent processing steps (filters) 
+that are connected by channels (pipes)}~\cite[p.~70]{hohpe_enterprise_2012}.
 Adopting this pattern, the \service{gossip-publisher-zmq} plugin acts as the initial filter, 
 validating the authenticity of incoming gossip messages at the \gls{cln} node level. 
 Validated messages are then transmitted via a \tech{ZeroMQ} message queue to the \service{gossip-processor} service. 
@@ -215,7 +211,6 @@ official plugin documentation~\cite{corelightningdevelopers_cln_2026}.
 The \gls{cln} architecture delegates gossip management to the \term{gossipd deamon}. 
 This process persists all gossip into a specialized append-only log file known as the \file{gossip\_store}. 
 Every collected message is stored as a \term{record}, encapsulating the raw gossip payload within a structural wrapper.
-
 The file begins with a \qty{1}{\byte} \term{File Header}. 
 The top \qty{3}{\bit} encode the major version (currently \num{0}), 
 while the lower \qty{5}{\bit} encode the minor version (currently \num{15}). 
@@ -246,12 +241,11 @@ Following this header, the file consists of a sequence of records.
     \label{fig:core-lightning-gossip-store-bytefield}
 \end{figure}
 
-The byte layout of an individual record is depicted in \autoref{fig:core-lightning-gossip-store-bytefield}.
+The byte layout of an individual record is shown in \autoref{fig:core-lightning-gossip-store-bytefield}.
 
 \subsubsection{Retrieval Logic}
 To monitor the network in real-time, the plugin opens a read-only binary handle to the 
 \file{gossip\_store} file and maintains a pointer to the current file offset.
-
 When new data is appended by the \term{gossipd daemon}, the plugin advances the file handle to read the \code{record.header}. 
 It extracts the payload length ($L$) from the \code{len} field (a fixed \code{be16} integer). 
 It then reads the subsequent $L$ bytes to retrieve the full message body.
@@ -302,25 +296,21 @@ The plugin events get analysed and added into the \service{ln-history-database}.
 \subsubsection{Real-time ingestion}
 By utilizing a concurrent architecture, the \service{gossip-processor} can consume gossip messages 
 from the network without blocking database write operations, ensuring low-latency ingestion (\ref{req:ingestion}).
-
 The database worker continuously dequeues messages, aggregating them into batches of a configurable size 
 (governed by the \code{BATCH\_SIZE} environment variable, which defaults to $200$).
 Each batch is encapsulated within a single atomic transaction, ensuring data integrity in the event of a failure.
-
 Message processing begins by storing the observation metadata (\ref{req:metadata}). 
 The \code{gossip\_id}, \code{collector\_node\_id}, and the \code{seen\_at} 
 timestamp are inserted into the \code{gossip\_observations} table 
 tracking exactly when and by which collector node the message was seen, 
 seamlessly allowing the system to scale to multiple collecting nodes (\ref{req:multiple-nodes}).
-
 As a next step the gossip message gets upserted (create a new row or update if it exists) into the \code{gossip\_inventory} table.
 If the \code{gossip\_id} is already present in the table, the query yields a \code{rowcount} of $0$, 
 meaning that the gossip message is a duplicate and does not need to be further processed.
-
 The processing branches depending on the specific gossip message type:
 
 \paragraph{Channel Announcements}
-For each \code{channel\_announcement} the \service{gossip-processor} checks foreign key constraints 
+For each \code{channel\_announcement} the foreign key constraints are checked by the \service{gossip-processor} 
 by ensuring both participating \code{node\_id}s exist in the \code{nodes} table, inserting them if they are missing.
 After that, the channel is inserted into the \code{channels} table. 
 While the raw message data is persisted alongside the parsed attributes, fulfilling the dual-format requirement (\ref{req:dual-format}), 
@@ -363,13 +353,10 @@ but it generated an unsustainable volume of read and write operations against th
 Depending on the specific message type, processing a single gossip message required between three and six individual database queries.
 During peak network activity, where the volume reaches an order of magnitude of $100$ gossip messages per second, 
 this sequential approach exhausted the database's capacity due to high random disk I/O.
-
 The operation of only two collector nodes already induced a cumulative processing lag 
 and made the database throughput the primary bottleneck for scalability \tech{ln-history}.
-
 To resolve this limitation, the ingestion pipeline was refactored to aggregate gossip messages into batches,
 that are executed within a single atomic database transaction.
-
 This architectural upgrade reduced the transaction overhead and the frequency of disk writes, 
 yielding improvements in the overall throughput and enabling scaling.
 
@@ -378,12 +365,10 @@ yielding improvements in the overall throughput and enabling scaling.
 \label{sec:batch-pipeline}
 The batch ingestion pipeline is done via a \tech{Python} script called \file{bulk-import.py} 
 and the source code found at\footnote{\url{https://ln-history.info/bulk-import.py}}.
-
 Because historic imports are rare, high-volume operations applied to bounded datasets, 
 a dedicated batch processing script is utilized to fulfil the batch ingestion requirement (\ref{req:batch-ingestion}).
 As outlined by \citeauthor{kleppmann_designing_2017}~\cite{kleppmann_designing_2017}, 
 batch processing frameworks maximize throughput by avoiding random, individual database writes. 
-
 Unlike the real-time \service{gossip-processor}, which relies on the database for conflict resolution, 
 this script optimizes performance by performing data grouping and temporal boundary calculations 
 entirely in memory prior to executing bulk database inserts. It achieves this using a two-pass algorithm.
@@ -394,13 +379,10 @@ In the first pass, the script sequentially processes the provided file of binary
 gossip messages (denoted as \term{historic gossip messages} in \autoref{fig:architecture-high-level}).
 The messages are extracted and parsed utilizing the \code{ln-history-python-client}, 
 which is detailed further in \autoref{sec:ln-history-python-client}.
-
-he script tracks the \code{first\_seen} and \code{last\_seen} timestamps during the extraction
+The script tracks the \code{first\_seen} and \code{last\_seen} timestamps during the extraction
 for every encountered \code{node\_id} and temporarily caches \code{channel\_announcement} messages in memory.
-
 Because historical dumps inherently lack metadata regarding which specific collector node received the message, 
-the script utilizes a configured environment variable (\code{HISTORIC\_COLLECTOR\_NODE\_ID} 
-\footnote{defaults to \code{01000000000000000000000000000000}}) to inject dummy collector node values. 
+the script utilizes a configured environment variable (\code{HISTORIC\_COLLECTOR\_NODE\_ID}) to inject dummy collector node values. 
 This allows the script to successfully reconstruct the required relations and insert every parsed message
 into both the \code{gossip\_inventory} and \code{gossip\_observations} tables.
 
@@ -414,7 +396,6 @@ During this pass, it also compares adjacent records to flag whether a \code{chan
 a fee change (\code{is\_fee\_update}) or a routing change (\code{is\_topology\_update}).
 Once the temporal state is completely constructed in memory, 
 the script flushes the formatted data into the PostgreSQL database using high-performance batch operations.
-
 Ultimately, an asynchronous backfill query aligns the \code{internal\_id} fields across the content tables.
 
 \paragraph{Discussing Limitations of Bulk insertion}
@@ -493,15 +474,13 @@ The data model of the \service{ln-history-database} is grouped into four logical
     }
     \label{fig:db-master-registry}
 \end{figure}
-~
-The centre of the data model is shown in\autoref{fig:db-master-registry} and begins with 
+
+The centre of the data model, see \autoref{fig:db-master-registry} begins with 
 the \code{gossip\_inventory} table, which functions as an append-only ledger. 
 It registers every unique message via its \code{gossip\_id} and assigns a strictly monotonically increasing \code{internal\_id}. 
-
 The \code{gossip\_id} is the \code{SHA256} hash of the raw bytes of the gossip message. 
 Due to the nature of this hashing function, a collision is statistically almost impossible to occur,
 making this a viable option to uniquely identify and reference a gossip message.
-
 As advocated by \citeauthor{kleppmann_designing_2017}~\cite[Chapter~3]{kleppmann_designing_2017}, 
 structuring the core database as an append-only log of immutable events ensures 
 robust data integrity and prevents the loss of historical context, 
@@ -597,11 +576,9 @@ fulfilling the need for long-term persistence (\ref{req:persistance}).
 The fundamental topological state of the \gls{ln} is preserved within the following tables: 
 \code{nodes}, \code{channels}, \code{node\_announcements}, and \code{channel\_updates}
 as shown in \autoref{fig:db-content-tables}.
-
 Because the \tech{ln-history} platform is designed to reconstruct historical snapshots,
 these tables implement a \gls{scd} Type 2 architecture that allows retaining multiple 
 versioned records allows any past state to be accurately derived~\cite[Chapter~11]{kleppmann_designing_2017}. 
-
 Mutable records such as \code{node\_announcements} and \code{channel\_updates} 
 are versioned by two boundaries: \code{valid\_from} and \code{valid\_to} 
 (\code{channel\_announcements} with \code{funding\_timestamp} and \code{closing\_timestamp}).
@@ -740,7 +717,6 @@ To persist this information, specifically the session data, the data model shown
 To satisfy the dual requirements of high-throughput real-time ingestion (\gls{oltp}) 
 and complex historical analysis (\gls{olap}) without blocking each other (\ref{req:concurrency}), 
 the schema employs custom B-Tree indexes.
-
 B-Trees are the industry standard for database indexing, providing logarithmic time complexity 
 for both exact matches and range queries~\cite[Chapter~14]{garcia-molina_database_2009}.
 Primary keys enforce referential integrity across the database, ensuring that duplicate \code{gossip\_id}s are always rejected.
@@ -749,7 +725,7 @@ Beyond structural constraints, composite indexes are heavily utilized to acceler
 For example, the \code{channel\_updates} table owns the \code{idx\_chan\_upd\_lookup} index on the column triple \code{(scid, direction, valid\_to)}, 
 as well as the \code{idx\_chan\_upd\_validity} index combining \code{(valid\_from, valid\_to)}. 
 Likewise, the \code{node\_announcements} table utilizes the \code{idx\_node\_ann\_validity} index on \code{(valid\_from, valid\_to)}
-and the \code{channel\_announcements} table \code{idx\_chan\_val\-id\-ity} on \code{(funding\_timestamp, closing\_timestamp)}.
+and the \code{channel\_announcements} table utilizes the \code{idx\_chan\_val\-id\-ity} on \code{(funding\_timestamp, closing\_timestamp)}.
 
 Joining tables is a necessary operation for in-depth analytical queries 
 but can rapidly become a performance bottleneck if executed on suboptimal data types~\cite[Chapter~15]{garcia-molina_database_2009}.
@@ -805,7 +781,7 @@ and a secondary fallback mechanism (\term{slow path}),
 determined by the availability of the participating nodes' on-chain public keys.
 
 \paragraph{Primary Retrieval (Fulcrum Indexer)}
-If both \code{bitcoin\_key\_1} and \code{bitcoin\_key\_2} are present in the channel's gossip data, 
+If \code{bitcoin\_key\_1} and \code{bitcoin\_key\_2} are present in the channel's gossip data, 
 the funding worker utilizes the fast path. 
 It reconstructs the channel's 2-of-2 multisignature \gls{p2wsh} address by sorting the raw keys lexicographically 
 in accordance with BIP67 rules~\cite{kerin_bip_2015}, and hashing the resulting witness script. 
@@ -949,7 +925,6 @@ Lastly, each model implements serialization methods (\code{to\_dict}) to help de
 \subsubsection{Parsing Strategy}
 Deserializing raw byte streams into structured objects is heavily optimized within the \code{parser} directory. 
 Instead of relying on monolithic evaluation blocks, the library implements an extensible \textit{Factory Pattern} (\file{parser\_factory.py}). 
-
 By inspecting the first two bytes of a raw message, the factory determines the message type and 
 dynamically routes the byte stream (\code{io.BytesIO}) to the corresponding parser defined in \file{parser\_map.py}. 
 The individual parsers then utilize Python's \code{struct.unpack} library to safely extract \gls{be} integers and cryptographic signatures.

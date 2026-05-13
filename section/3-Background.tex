@@ -25,7 +25,6 @@ As defined by \citeauthor{patterson_computer_2014}~\cite{patterson_computer_2014
 this is the convention a machine uses to number bytes within a word. 
 In \term{\gls{be}} format, the most significant byte is transmitted first, 
 whereas \term{\gls{le}} format transmits the least significant byte first.
-
 This distinction frequently creates friction between hardware and network engineering. 
 While modern processor architectures (such as x86 and ARM) predominantly execute in \gls{le}, 
 standard network communication protocols enforce \gls{be}~\cite{reynolds_rfc_1994}. 
@@ -62,7 +61,6 @@ depending on their value~\cite{antonopoulos_bitcoinbook_2024}.
 
 It is important to note that the \code{VarInt} standard in Bitcoin does not support 
 negative numbers or integers exceeding the 64-bit unsigned limit ($2^{64}$).
-
 Further details can be found directly in the codebase of the Bitcoin Core software at 
 \code{src/serialize.h}~\cite{bitcoincoredevelopers_bitcoin_2026}. 
 
@@ -132,9 +130,7 @@ known as the \code{txid} (transaction ID).
 An output has a specific amount of \term{satoshis} and assigns 
 a cryptographic locking script (the \code{scriptPubKey})
 determining the conditions required to spend it. 
-
 The global state of the Bitcoin network is the set of all currently existing \glspl{utxo}.
-
 To spend a \gls{utxo}, a user constructs a new transaction where the input provides 
 the exact \code{txid} and the specific index (\code{vout}) of the previous output, 
 alongside an unlocking script (a digital signature) to satisfy the cryptographic lock.
@@ -230,7 +226,6 @@ leading to highly congested mempools and surging transaction fees.
 These scalability challenges triggered a conflict known as the \enquote{Blocksize War}~\cite{bier_blocksize_2021}. 
 A group of corporate entities and mining pools advocated for a \term{hard-fork} to increase the block size, 
 while independent researchers and protocol developers argued for maintaining the limit and scaling via layered architectural upgrades. 
-
 The developers' approach ultimately succeeded, resulting in the 2017 activation of 
 a backwards-compatible soft-fork known as Segregated Witness (\term{SegWit}).
 
@@ -239,7 +234,6 @@ the cryptographic signatures (the witness) from the transaction inputs.
 Most importantly for Layer-2 scalability, SegWit eliminated third-party \term{transaction malleability},
 a vulnerability where an attacker could alter a \code{txid} before it was confirmed. 
 By fixing this, SegWit finally made it secure to chain unconfirmed transactions together.
-
 Furthermore, the protocol relies on \glspl{htlc}, 
 which are specialized Bitcoin scripts that lock funds using hash preimages and time expirations. 
 Together with the activation of SegWit, these changes laid the 
@@ -650,7 +644,6 @@ it must synchronize its local graph with the network to ensure its routing table
 To facilitate this, BOLT\#7 defines a suite of query messages that allow nodes to request 
 targeted subsets of the gossip data rather than downloading 
 the entire network history unnecessarily~\cite[Section~Query Messages]{lightningdevelopers_lightning_2018}.
-
 We divide the query messages into their two-step synchronization workflow:
 
 \begin{enumerate}

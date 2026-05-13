@@ -4,8 +4,8 @@
 This chapter outlines future directions for research and development 
 based on the empirical findings of this thesis. 
 
-Building upon the capabilites of the \tech{ln-history} platform demonstrated, 
-we list numerous avenues for extending its capabilites in \autoref{sec:ln-history-project}.
+Building upon the capabilities of the \tech{ln-history} platform demonstrated, 
+we list numerous avenues for extending these in \autoref{sec:ln-history-project}.
 
 Secondly, because the empirical data highlighted inefficiencies in the gossip protocol, 
 \autoref{sec:ln-gossip-protocol} explores its ongoing development. 
@@ -78,12 +78,12 @@ The platform could be extended to track and analyse the following network statis
 
 \paragraph{Infrastructural Scaling}
 
-Currently, the platform operates on a single virtualized machine utilizing \tech{Docker Compose}. 
+Currently, the platform operates on a single virtual machine utilizing \tech{Docker Compose}. 
 While this was a solid, resource-efficient decision for the scope of this thesis, 
 the planned addition of new collector nodes and heavier analytical workloads will require more resources. 
 
 To achieve true \term{high-availability} and manage growing data volumes, 
-the infrastructure should be migrated to \tech{Kubernetes}. 
+the infrastructure should be migrated to \tech{Kubernetes}~\cite{burns_borg_2016}. 
 Adopting this industry standard for container orchestration would enable a new degree of scalability, 
 allowing individual services such as the \service{gossip-processor} and \service{chain-enricher}
 to be scaled horizontally across a distributed cluster based on real-time network traffic.
@@ -100,7 +100,7 @@ to optimize bandwidth and propagation efficiency.
 
 \paragraph{Gossip v2}
 The activation of the Taproot soft fork introduced the cryptographic foundation for \term{Taproot channels}~\cite{wuille_bip341_2020}. 
-Unlike \textit{legacy} channels that rely on highly visible 2-of-2 \gls{p2wsh} multisignature scripts, 
+Unlike \textit{legacy} channels that rely on visible 2-of-2 \gls{p2wsh} multisignature scripts, 
 Taproot channels utilize Schnorr signatures~\cite{wuille_bip340_2020} and MuSig2 key aggregation~\cite{nick_musig2_2021}. 
 This allows the channel funding transaction to appear identically to a standard, single-signature transaction on-chain, 
 improving network privacy by making Lightning channels look like regular Bitcoin transactions.
@@ -116,7 +116,7 @@ The specification draft has just been merged on May 4th 2026~\cite{mouton_extens
 As concluded in \autoref{ch:conclusion}, the current \gls{ln} gossip protocol suffers 
 from bandwidth inefficiencies and incorrect synchronization. 
 \citeauthor{lightningdevelopers_bolts_2018} have explored alternatives to tackle these challenges. 
-The underlying problem of efficiently synchronizing state across a distributed network 
+The underlying problem of efficiently synchronizing a state across a distributed network 
 is not unique to the \gls{ln} but a fundamental challenge in \gls{p2p} networks.
 
 For example, the Bitcoin network layer has faced similar transaction relay bottlenecks and 
@@ -130,9 +130,9 @@ Because set reconciliation requires additional network roundtrips to compute the
 before actual data transmission, it is by design slower than \textit{naive fanout} flooding. 
 
 Developers are actively debating whether the theoretical bandwidth savings justify 
-the substantial increase in protocol complexity and the degradation in propagation speed~\cite{fleon_erlay_2026}. 
+the substantial increase in complexity and the downgrade in propagation speed~\cite{fleon_erlay_2026}. 
 This ongoing debate shows that moving away from flood-based routing is a delicate 
-architectural decistion rather than a trivial protocol upgrade.
+architectural decision rather than a trivial protocol upgrade.
 
 \begin{figure}[H]
     \centering
@@ -189,7 +189,7 @@ When comparing these sketches, nodes can calculate the symmetric difference
 between their states and request only the specific missing messages and therefore reduce bandwidth usage.
 
 The application of this technology to the \gls{ln} has been considered since the 
-network's early days, as evidenced by \citeauthor{russel_diyhplus_2018}'s initial 
+network's early days, as seen by \citeauthor{russel_diyhplus_2018}'s initial 
 mailing list proposals in \citeyear{russel_diyhplus_2018}~\cite{russel_diyhplus_2018}. 
 The concept was later refined by \citeauthor{myers_magical_2022} in the \term{Magical Minisketch} proposal~\cite{myers_magical_2022}. 
 Most recently, active research has resumed on the \textit{Delving Bitcoin} forum, 
@@ -201,12 +201,11 @@ to gather the empirical data necessary to design a Minisketch-based gossip archi
 \label{sec:the-role-of-ln}
 
 We take a step back and look at Bitcoins goal to be classified as money.
-An asset must fulfil three functions to be classified as money. 
+For that, an asset must fulfil the following three functions. 
 It must serve as a \textit{Medium of Exchange}, a \textit{Unit of Account}, and a \textit{Store of Value}~\cite{jevons_money_1875}.
 The \gls{ln} as a scaling solution focuses on making Bitcoin a viable Medium of Exchange.
-
 This last section will first present the current state of the research that focuses on the limitations of the \gls{ln}.
-Further, it introduces new designs, like \term{Multi Party Channels} as well as neighbouring projects 
+Further, it introduces new designs, like \gls{mpc} as well as neighbouring projects 
 that present an alternative to the design of the \gls{ln}.
 
 
@@ -214,19 +213,16 @@ that present an alternative to the design of the \gls{ln}.
 
 While the \gls{ln} facilitates significantly faster and cheaper payments than the 
 Bitcoin base layer, its theoretical scalability is still bounded by its topology. 
-
 The formalization of these constraints, achieved through the mathematical modelling of payment channel networks, 
 has been pioneered by \citeauthor{pickhardt_mathematical_2026}~\cite{pickhardt_mathematical_2026}.
-
 In a recent presentation, \citeauthor{pickhardt_mathematical_2026} demonstrated 
 that the network's maximum throughput is constrained by the rate of infeasible payments~\cite{pickhardt_everything_2025}. 
-
 His model reveals a trade-off between transaction size, 
 routing reliability, and overall network throughput. 
 For example, to maintain a \qty{90}{\percent} likelihood of feasibility for larger payments 
 (up to \qty{922259}{\sat} within the professional routing network\footnote{Selected subset of \textit{central} nodes and channels in the \gls{ln}}), 
 the expected bandwidth is limited at \num{70} payments per second~\cite{pickhardt_everything_2025}. 
-This throughput is only a one order of magnitude higher than the capacity of the underlying Bitcoin blockchain.
+This throughput is only one order of magnitude higher than the capacity of the underlying Bitcoin blockchain.
 
 
 \paragraph{Multi Party Channels}
@@ -235,22 +231,18 @@ To overcome these structural limitations, \citeauthor{pickhardt_mathematical_202
 advocates for the deployment of \term{\glspl{mpc}} and channel factories. 
 By allowing multiple participants to share a single on-chain \gls{utxo}.
 \glspl{mpc} could scale transaction throughput by several orders of magnitude. 
-
 The integration would require big changes to the current \gls{ln} protocol and its client implementations.
-
 This limitation in addition to other challenges (infrastructure management, user-experience) indicates that 
-further development to elevate \gls{ln} might be outside the current Lightning protocol itself. 
+further development to elevate \gls{ln} might even exist outside the current Lightning protocol itself. 
 
 
 \paragraph{Emerging Second Layer Solutions}
 
 Alternative second layer architectures have emerged to tackle liquidity and user-experience challenges.
-
 In \citeyear{keceli_bitcoindev_2023}, \citeauthor{keceli_bitcoindev_2023} introduced \tech{Ark}~\cite{keceli_bitcoindev_2023}. 
 This protocol utilizes \glspl{vtxo} to facilitate off-chain payments without requiring users to manage inbound liquidity,
 which is a major friction point within the \gls{ln}. 
 Multiple independent implementations of this protocol are currently in active development. 
-
 Similarly, the \tech{Spark} protocol, developed by \citeauthor{lightspark_buildonspark_2026}~\cite{lightspark_buildonspark_2026}, 
 leverages statechains alongside a shared-signing architecture to seamlessly transfer \gls{utxo} ownership off-chain.
 
@@ -269,18 +261,12 @@ utilizing the blind signature cryptography invented by \citeauthor{chaum_blind_1
 
 These emerging alternative protocols vary in their custody design.
 Solutions like \tech{Ark}, \tech{Spark}, \tech{Cashu} claim to be self-custodial
-because the user retains unilateral exit rights to the Bitcoin base layer.
+because the user keeps unilateral exit rights to the Bitcoin base layer.
 Nonetheless, their architectures require a \enquote{central} server, 
 such as an Ark Service Provider (ASP), a Spark Service Provider (SSP), or a Cashu Mint
 to coordinate liquidity or route payments. 
 
 This mediated architecture stands in contrast to the \gls{ln} where
 node operators maintain absolute control over their bitcoin. 
-
 Ultimately, these developments indicate that the future of Bitcoin scaling 
-might be a balance between sovereinty and convenience. 
-Users decide individually between the trade-offs of
-strict sovereignty or mediated operational convenience.
-
-To support these advancements, \tech{ln-history} provides robust, transparent, and historical data collection 
-and analysis, establishing a foundation for research and protocol decisions.
+might be a balance between sovereignty and convenience. 
